@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local AI Chat</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f8fafc;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #0f172a;
+      color: white;
+      padding: 14px 20px;
+      text-align: center;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    #model {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    #status {
+      font-size: 12px;
+      margin-top: 4px;
+      color: #38bdf8;
+    }
+
+    #model-menu {
+      padding: 24px;
+      max-width: 600px;
+      width: 100%;
+      margin: auto;
+    }
+
+    #model-menu h2 {
+      text-align: center;
+      color: #0f172a;
+      margin-bottom: 18px;
+    }
+
+    .model-button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 14px 18px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: white;
+      color: #0f172a;
+      font-size: 15px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: all 0.2s ease;
+    }
+
+    .model-button:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+
+    .model-button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .loaded {
+      background: #f0fdf4;
+      border-color: #86efac;
+      color: #166534;
+    }
+
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 15px;
+      max-width: 900px;
+      width: 100%;
+      margin: auto;
+      display: none;
+    }
+
+    .message {
+      margin: 14px 0;
+      padding: 14px 18px;
+      border-radius: 14px;
+      max-width: 88%;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .user {
+      background: #0284c7;
+      color: white;
+      margin-left: auto;
+      white-space: pre-wrap;
+    }
+
+    .ai {
+      background: white;
+      border: 1px solid #e2e8f0;
+      color: #0f172a;
+      margin-right: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      width: 100%;
+    }
+
+    .system {
+      background: #f1f5f9;
+      color: #64748b;
+      margin: 10px auto;
+      text-align: center;
+      font-size: 13px;
+      padding: 8px 14px;
+      white-space: pre-wrap;
+    }
+
+    .progress-box {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #0284c7;
+      transition: width 0.2s ease;
+    }
+
+    .thinking-wrapper {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+      font-size: 13px;
+      display: none;
+    }
+
+    .thinking-header {
+      padding: 10px 14px;
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid #e2e8f0;
+      transition: background 0.15s ease;
+    }
+
+    .thinking-header:hover {
+      background: #e2e8f0;
+    }
+
+    .thinking-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      background: #0284c7;
+      border-radius: 50%;
+      animation: pulse 1.2s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.8); opacity: 0.4; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.8); opacity: 0.4; }
+    }
+
+    .thinking-content {
+      padding: 14px;
+      color: #334155;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      white-space: pre-wrap;
+      max-height: 380px;
+      overflow-y: auto;
+      line-height: 1.55;
+      background: #fcfcfd;
+    }
+
+    .thinking-content.collapsed {
+      display: none;
+    }
+
+    .internal-wrapper {
+      background: #fafaf9;
+      border: 1px solid #d6d3d1;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+      font-size: 13px;
+      display: none; 
+    }
+
+    .internal-header {
+      padding: 10px 14px;
+      background: #f5f5f4;
+      color: #44403c;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid #d6d3d1;
+      transition: background 0.15s ease;
+    }
+
+    .internal-header:hover {
+      background: #e7e5e4;
+    }
+
+    .internal-content {
+      padding: 14px;
+      color: #44403c;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      white-space: pre-wrap;
+      max-height: 380px;
+      overflow-y: auto;
+      line-height: 1.55;
+      background: #fafaf9;
+    }
+
+    .internal-content.collapsed {
+      display: none;
+    }
+
+    .internal-divider {
+      margin: 12px 0;
+      border-top: 1px dashed #d6d3d1;
+    }
+
+    .internal-label {
+      font-weight: 700;
+      color: #78716c;
+      margin-bottom: 6px;
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tool-box {
+      background: #fefce8;
+      border: 1px solid #fef08a;
+      border-radius: 8px;
+      padding: 9px 13px;
+      margin-bottom: 12px;
+      font-size: 12.5px;
+      color: #854d0e;
+      display: none;
+    }
+
+    .tool-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+    }
+
+    .response-content {
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    .status-badge-cancelled {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #b91c1c;
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 6px;
+      height: 15px;
+      background: #0284c7;
+      margin-left: 3px;
+      vertical-align: middle;
+      animation: blink 0.8s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+
+    #input-area {
+      display: none;
+      flex-direction: column;
+      padding: 14px 20px;
+      background: white;
+      border-top: 1px solid #e2e8f0;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .translation-toggle {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .translation-toggle input {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    /* File Preview Styles */
+    #file-preview-container {
+      display: none;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .file-badge {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .file-remove {
+      cursor: pointer;
+      font-weight: bold;
+      color: #94a3b8;
+      font-size: 14px;
+      transition: color 0.15s;
+    }
+    
+    .file-remove:hover {
+      color: #ef4444;
+    }
+
+    .input-row {
+      display: flex;
+      width: 100%;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    #attach-btn {
+      background: transparent;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 18px;
+      color: #64748b;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    #attach-btn:hover {
+      background: #f1f5f9;
+      color: #0284c7;
+      border-color: #94a3b8;
+    }
+
+    #input {
+      flex: 1;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 15px;
+      resize: none;
+      font-family: inherit;
+      outline: none;
+    }
+
+    #input:focus {
+      border-color: #0284c7;
+      box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+    }
+
+    #send {
+      padding: 0 22px;
+      height: 46px;
+      border: none;
+      border-radius: 10px;
+      background: #0f172a;
+      color: white;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s active;
+    }
+
+    #send:hover {
+      background: #1e293b;
+    }
+
+    #send.cancel-state {
+      background: #dc2626;
+    }
+
+    #send.cancel-state:hover {
+      background: #b91c1c;
+    }
+
+    #change-model {
+      display: none;
+      margin: 12px auto;
+      padding: 6px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: white;
+      font-size: 13px;
+      cursor: pointer;
+      color: #475569;
+    }
+
+    #change-model:hover {
+      background: #f1f5f9;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  🧠 Local AI
+  <div id="model">Loading models...</div>
+  <div id="status">Connecting...</div>
+</header>
+
+<div id="model-menu">
+  <h2>Select a main model</h2>
+  <div id="models"></div>
+</div>
+
+<button id="change-model">🔄 Change model</button>
+<div id="chat"></div>
+
+<div id="input-area">
+  <label class="translation-toggle">
+    <input type="checkbox" id="translate-checkbox" checked>
+    Enable Translation (PT ↔ EN)
+  </label>
+  
+  <div id="file-preview-container"></div>
+  
+  <div class="input-row">
+    <button id="attach-btn" title="Upload PDF, text, code, or image files">📎</button>
+    <input
+      type="file"
+      id="file-input"
+      multiple
+      hidden
+      accept=".pdf,.txt,.md,.csv,.json,.xml,.html,.js,.ts,.tsx,.jsx,.java,.cpp,.h,.hpp,.py,.sql,.jpg,.jpeg,.png,.webp,.gif"
+    >
+    
+    <textarea id="input" rows="2" placeholder="Digite sua mensagem..."></textarea>
+    <button id="send">Send</button>
+  </div>
+</div>
+
+<script>
+const LM_STUDIO_URL = "http://192.168.0.177:1234";
+const LM_API_TOKEN = "";
+
+// The browser uploads the ORIGINAL file bytes to this service.
+// Expected response:
+// { files: [{ name, type, size, text?, data_url? }] }
+const FILE_UPLOAD_URL = "http://192.168.0.177:8080/api/files";
+
+let selectedModel = null;
+const TRANSLATOR_MODEL_ID = "google/gemma-3-1b";
+let translatorModelKey = TRANSLATOR_MODEL_ID;
+let previousResponseId = null;
+let models = [];
+let activeAbortController = null;
+let isGenerating = false;
+let pendingFiles = [];
+
+const modelLabel = document.getElementById("model");
+const statusLabel = document.getElementById("status");
+const modelsContainer = document.getElementById("models");
+const modelMenu = document.getElementById("model-menu");
+const chat = document.getElementById("chat");
+const inputArea = document.getElementById("input-area");
+const changeModel = document.getElementById("change-model");
+const input = document.getElementById("input");
+const send = document.getElementById("send");
+
+// File Attachment Logic
+const fileInput = document.getElementById("file-input");
+const attachBtn = document.getElementById("attach-btn");
+const filePreview = document.getElementById("file-preview-container");
+
+attachBtn.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", (e) => {
+  for (const file of e.target.files) {
+    pendingFiles.push(file);
+  }
+  renderFilePreview();
+  fileInput.value = ""; 
+});
+
+function renderFilePreview() {
+  filePreview.innerHTML = "";
+  if (pendingFiles.length === 0) {
+    filePreview.style.display = "none";
+    return;
+  }
+  filePreview.style.display = "flex";
+  pendingFiles.forEach((file, idx) => {
+    const badge = document.createElement("div");
+    badge.className = "file-badge";
+    badge.innerHTML = `
+      <span>📄 ${file.name}</span>
+      <span class="file-remove" onclick="removeFile(${idx})" title="Remove file">✕</span>
+    `;
+    filePreview.appendChild(badge);
+  });
+}
+
+window.removeFile = function(idx) {
+  pendingFiles.splice(idx, 1);
+  renderFilePreview();
+};
+
+async function uploadFilesToServer() {
+  if (pendingFiles.length === 0) return { text: "", images: [] };
+
+  const formData = new FormData();
+
+  for (const file of pendingFiles) {
+    formData.append("files", file, file.name);
+  }
+
+  const response = await fetch(FILE_UPLOAD_URL, {
+    method: "POST",
+    body: formData,
+    signal: activeAbortController ? activeAbortController.signal : undefined
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`File upload failed (HTTP ${response.status}): ${body}`);
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data.files)) {
+    throw new Error(
+      "Upload server returned an invalid response. Expected { files: [...] }."
+    );
+  }
+
+  let text = "";
+  const images = [];
+
+  for (const file of data.files) {
+    if (file.text) {
+      text += `\n--- Start of attached file: ${file.name} ---\n`;
+      text += file.text;
+      text += `\n--- End of attached file: ${file.name} ---\n`;
+    }
+
+    if (
+      file.data_url &&
+      String(file.type || "").startsWith("image/")
+    ) {
+      images.push({
+        name: file.name,
+        data_url: file.data_url
+      });
+    }
+  }
+
+  return { text, images };
+}
+
+// Utility functions
+function isTranslatorModel(key) {
+  if (!key) return false;
+  const k = String(key).trim().toLowerCase();
+  return k === TRANSLATOR_MODEL_ID.toLowerCase() ||
+         (k.includes("gemma") && k.includes("3-1b"));
+}
+
+function getModelKey(model) {
+  return model?.key || model?.id || model?.model || "";
+}
+
+function getModelName(model) {
+  return model?.display_name || model?.name || getModelKey(model);
+}
+
+function getHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  if (LM_API_TOKEN) headers["Authorization"] = `Bearer ${LM_API_TOKEN}`;
+  return headers;
+}
+
+function setStatus(text) {
+  statusLabel.textContent = text;
+}
+
+function scrollToBottom(force = false) {
+  const threshold = 40;
+  const isAtBottom = (chat.scrollHeight - chat.clientHeight - chat.scrollTop) <= threshold;
+  if (force || isAtBottom) {
+    chat.scrollTop = chat.scrollHeight;
+  }
+}
+
+async function loadModels() {
+  try {
+    setStatus("Connecting to LM Studio...");
+    
+    let response = await fetch(`${LM_STUDIO_URL}/api/v1/models`, { headers: getHeaders() }).catch((err) => { console.warn("Falha em /api/v1/models:", err); return null; });
+    
+    if (!response || !response.ok) {
+      response = await fetch(`${LM_STUDIO_URL}/v1/models`, { headers: getHeaders() });
+    }
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ` + await response.text());
+
+    const data = await response.json();
+    const rawList = data.models || data.data || [];
+    const allLlmModels = rawList
+      .map(model => ({ ...model, key: getModelKey(model), display_name: getModelName(model) }))
+      .filter(model => model.key && (!model.type || model.type === "llm"));
+
+    const translatorObj = allLlmModels.find(m => isTranslatorModel(m.key || m.id));
+    if (translatorObj) {
+      translatorModelKey = translatorObj.key || translatorObj.id;
+      ensureTranslatorLoaded(translatorObj).catch(err => console.warn("Erro ao pre-carregar tradutor:", err));
+    }
+
+    models = allLlmModels.filter(m => !isTranslatorModel(m.key || m.id));
+
+    if (!translatorObj) {
+      console.warn(`Modelo tradutor ${TRANSLATOR_MODEL_ID} não encontrado na lista do LM Studio.`);
+    }
+
+    if (models.length === 0) {
+      modelsContainer.innerHTML = "<p>❌ Nenhum modelo principal encontrado.</p>";
+      setStatus("Nenhum modelo disponível");
+      return;
+    }
+
+    renderModels();
+    setStatus(`${models.length} modelo(s) disponível(is)`);
+  } catch (error) {
+    console.error("Erro ao carregar modelos:", error);
+    modelsContainer.innerHTML = `
+      <p>❌ Não foi possível conectar ao LM Studio.</p>
+      <p style="color:red; font-size:13px;">${error.message}</p>
+      <button onclick="loadModels()" style="margin-top:10px; padding:6px 12px; cursor:pointer;">Tentar novamente</button>
+    `;
+    setStatus("Erro de conexão");
+  }
+}
+
+let translatorLoadPromise = null;
+
+async function ensureTranslatorLoaded(translatorObj) {
+  const modelKey = getModelKey(translatorObj);
+  if (!modelKey) throw new Error("Gemma 3 1B não possui um ID de modelo válido.");
+  translatorModelKey = modelKey;
+
+  if (translatorObj.loaded_instances?.length > 0) return true;
+  if (translatorLoadPromise) return translatorLoadPromise;
+
+  translatorLoadPromise = (async () => {
+    const response = await fetch(`${LM_STUDIO_URL}/api/v1/models/load`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({
+        model: modelKey,
+        context_length: 4096,
+        echo_load_config: true
+      })
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Falha ao carregar Gemma 3 1B (HTTP ${response.status}): ${body}`);
+    }
+    return true;
+  })().catch(err => {
+    translatorLoadPromise = null;
+    console.warn("Gemma 3 1B não pôde ser pré-carregado. A tradução tentará usar o modelo mesmo assim:", err);
+    return false;
+  });
+
+  return translatorLoadPromise;
+}
+
+function renderModels() {
+  modelsContainer.innerHTML = "";
+  models.forEach((model, index) => {
+    const button = document.createElement("button");
+    button.className = "model-button";
+    const loaded = model.loaded_instances && model.loaded_instances.length > 0;
+    if (loaded) button.classList.add("loaded");
+
+    button.textContent = `${index + 1}. ${getModelName(model)}${loaded ? "  ✓ LOADED" : ""}`;
+    button.onclick = () => selectModel(model);
+    modelsContainer.appendChild(button);
+  });
+}
+
+async function selectModel(model) {
+  document.querySelectorAll(".model-button").forEach(b => b.disabled = true);
+  selectedModel = getModelKey(model);
+  modelLabel.textContent = `Model: ${getModelName(model)}`;
+
+  try {
+    const loaded = model.loaded_instances && model.loaded_instances.length > 0;
+    if (loaded) {
+      setStatus("✓ Model already loaded");
+    } else {
+      await unloadOtherModels(selectedModel);
+      setStatus("⏳ Loading model into memory...");
+
+      const loadResponse = await fetch(`${LM_STUDIO_URL}/api/v1/models/load`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          model: model.key,
+          context_length: 8000,
+          echo_load_config: true
+        })
+      });
+
+      if (!loadResponse.ok) throw new Error(`HTTP ${loadResponse.status}: ` + await loadResponse.text());
+      const loadData = await loadResponse.json();
+      if (loadData.status !== "loaded") throw new Error("LM Studio did not report model as loaded.");
+
+      setStatus(`✓ Loaded in ${loadData.load_time_seconds?.toFixed(1) || "?"}s`);
+    }
+
+    previousResponseId = null;
+    modelMenu.style.display = "none";
+    chat.style.display = "block";
+    inputArea.style.display = "flex";
+    changeModel.style.display = "block";
+
+    addMessage(`✓ Model ready:\n${selectedModel}`, "system");
+    input.focus();
+  } catch (error) {
+    setStatus("❌ Failed to load model");
+    addMessage(`❌ Error loading model:\n\n${error.message}`, "system");
+    document.querySelectorAll(".model-button").forEach(b => b.disabled = false);
+  }
+}
+
+async function unloadOtherModels(selectedKey) {
+  const response = await fetch(`${LM_STUDIO_URL}/api/v1/models`, { headers: getHeaders() });
+  if (!response.ok) return;
+
+  const data = await response.json();
+  const allModels = (data.models || data.data || []).map(model => ({
+    ...model,
+    key: getModelKey(model),
+    display_name: getModelName(model)
+  }));
+
+  for (const model of allModels) {
+    if (model.key === selectedKey || isTranslatorModel(model.key)) continue;
+
+    const instances = model.loaded_instances || [];
+    for (const instance of instances) {
+      setStatus(`⏳ Unloading ${model.display_name || model.key}...`);
+      await fetch(`${LM_STUDIO_URL}/api/v1/models/unload`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ instance_id: instance.id })
+      });
+    }
+  }
+}
+
+function addMessage(text, type) {
+  const div = document.createElement("div");
+  div.className = `message ${type}`;
+  div.textContent = text;
+  chat.appendChild(div);
+  scrollToBottom(true);
+  return div;
+}
+
+function createAiMessagePlaceholder() {
+  const messageDiv = document.createElement("div");
+  messageDiv.className = "message ai";
+
+  const progressBox = document.createElement("div");
+  progressBox.className = "progress-box";
+  progressBox.innerHTML = `
+    <div class="progress-header">
+      <span class="progress-label">Processing prompt...</span>
+      <span class="progress-val">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill"></div></div>
+  `;
+
+  const toolBox = document.createElement("div");
+  toolBox.className = "tool-box";
+  toolBox.innerHTML = `
+    <div class="tool-header">
+      <span class="tool-title">⚡ Status: <span class="tool-name"></span></span>
+      <span class="tool-status">running...</span>
+    </div>
+  `;
+
+  const thinkingContainer = document.createElement("div");
+  thinkingContainer.className = "thinking-container";
+
+  const internalWrapper = document.createElement("div");
+  internalWrapper.className = "internal-wrapper";
+  internalWrapper.innerHTML = `
+    <div class="internal-header">
+      <div class="internal-title">🔍 Internal Processing (EN)</div>
+      <span class="internal-toggle">▼</span>
+    </div>
+    <div class="internal-content collapsed">
+      <span class="internal-label">Translated Prompt (PT ➔ EN)</span>
+      <div class="internal-prompt-text"></div>
+      <div class="internal-divider"></div>
+      <span class="internal-label">Raw Model Response (EN)</span>
+      <div class="internal-response-text"></div>
+    </div>
+  `;
+  const internalHeader = internalWrapper.querySelector(".internal-header");
+  const internalContent = internalWrapper.querySelector(".internal-content");
+  const internalToggle = internalWrapper.querySelector(".internal-toggle");
+  const internalPromptText = internalWrapper.querySelector(".internal-prompt-text");
+  const internalResponseText = internalWrapper.querySelector(".internal-response-text");
+
+  internalHeader.onclick = () => {
+    const isCollapsed = internalContent.classList.toggle("collapsed");
+    internalToggle.textContent = isCollapsed ? "▶" : "▲";
+    if (!isCollapsed) internalContent.scrollTop = internalContent.scrollHeight;
+  };
+
+  const responseContent = document.createElement("div");
+  responseContent.className = "response-content";
+
+  const cursor = document.createElement("span");
+  cursor.className = "cursor";
+
+  messageDiv.appendChild(progressBox);
+  messageDiv.appendChild(toolBox);
+  messageDiv.appendChild(thinkingContainer);
+  messageDiv.appendChild(internalWrapper); 
+  messageDiv.appendChild(responseContent);
+  messageDiv.appendChild(cursor);
+  chat.appendChild(messageDiv);
+  scrollToBottom(true);
+
+  let isThinking = false;
+  let currentThinking = null;
+
+  function createThinkingBlock(modelLabel) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "thinking-wrapper";
+
+    const header = document.createElement("div");
+    header.className = "thinking-header";
+
+    const title = document.createElement("div");
+    title.className = "thinking-title";
+    title.innerHTML = `<span class="pulse-dot"></span> <span class="think-label">Thinking... — ${modelLabel} (0.0s)</span>`;
+
+    const toggleIcon = document.createElement("span");
+    toggleIcon.textContent = "▶";
+
+    header.appendChild(title);
+    header.appendChild(toggleIcon);
+
+    const content = document.createElement("div");
+    content.className = "thinking-content collapsed";
+
+    header.onclick = () => {
+      const isCollapsed = content.classList.toggle("collapsed");
+      toggleIcon.textContent = isCollapsed ? "▶" : "▼";
+      if (!isCollapsed) content.scrollTop = content.scrollHeight;
+    };
+
+    wrapper.appendChild(header);
+    wrapper.appendChild(content);
+    thinkingContainer.appendChild(wrapper);
+
+    return { wrapper, title, content, toggleIcon, modelLabel, startTime: Date.now(), timer: null };
+  }
+
+  function finishThinkingBlock(block) {
+    if (!block) return;
+    const elapsed = ((Date.now() - block.startTime) / 1000).toFixed(1);
+    const label = block.title.querySelector(".think-label");
+    if (label) label.textContent = `Thought process — ${block.modelLabel} (${elapsed}s)`;
+    const dot = block.title.querySelector(".pulse-dot");
+    if (dot) dot.remove();
+    if (block.timer) clearInterval(block.timer);
+  }
+
+  return {
+    showPromptProgress(pct) {
+      progressBox.style.display = "block";
+      progressBox.querySelector(".progress-val").textContent = `${pct}%`;
+      progressBox.querySelector(".progress-fill").style.width = `${pct}%`;
+      scrollToBottom();
+    },
+
+    hidePromptProgress() {
+      if (progressBox.style.display !== "none") {
+        progressBox.style.display = "none";
+      }
+    },
+
+    showToolCall(toolName, status = "running...") {
+      toolBox.style.display = "block";
+      toolBox.querySelector(".tool-name").textContent = toolName;
+      toolBox.querySelector(".tool-status").textContent = status;
+      scrollToBottom();
+    },
+
+    completeToolCall(toolName) {
+      toolBox.style.display = "block";
+      toolBox.querySelector(".tool-name").textContent = toolName;
+      toolBox.querySelector(".tool-status").textContent = "✓ completed";
+      scrollToBottom();
+    },
+
+    startThinking(modelLabel = "Model") {
+      if (isThinking && currentThinking && currentThinking.modelLabel === modelLabel) return;
+
+      if (currentThinking && isThinking) {
+        finishThinkingBlock(currentThinking);
+      }
+
+      currentThinking = createThinkingBlock(modelLabel);
+      isThinking = true;
+
+      currentThinking.timer = setInterval(() => {
+        if (!isThinking || !currentThinking) return;
+        const elapsed = ((Date.now() - currentThinking.startTime) / 1000).toFixed(1);
+        const label = currentThinking.title.querySelector(".think-label");
+        if (label) label.textContent = `Thinking... — ${currentThinking.modelLabel} (${elapsed}s)`;
+      }, 100);
+      scrollToBottom();
+    },
+
+    appendThinking(text) {
+      if (!text) return;
+      if (!currentThinking || !isThinking) this.startThinking("Model");
+
+      const content = currentThinking.content;
+      const threshold = 30;
+      const isAtThinkingBottom = (content.scrollHeight - content.clientHeight - content.scrollTop) <= threshold;
+
+      content.textContent += text;
+      currentThinking.wrapper.style.display = "block";
+
+      if (isAtThinkingBottom) content.scrollTop = content.scrollHeight;
+      scrollToBottom();
+    },
+
+    endThinking() {
+      if (!currentThinking) return;
+      finishThinkingBlock(currentThinking);
+      isThinking = false;
+      scrollToBottom();
+    },
+
+    setInternalPrompt(text) {
+      internalWrapper.style.display = "block";
+      internalPromptText.textContent = text;
+      scrollToBottom();
+    },
+
+    appendInternalResponse(text) {
+      internalResponseText.textContent += text;
+      const threshold = 30;
+      const isAtBottom = (internalContent.scrollHeight - internalContent.clientHeight - internalContent.scrollTop) <= threshold;
+      if (isAtBottom && !internalContent.classList.contains("collapsed")) {
+        internalContent.scrollTop = internalContent.scrollHeight;
+      }
+      scrollToBottom();
+    },
+
+    appendContent(text) {
+      responseContent.textContent += text;
+      scrollToBottom();
+    },
+
+    setContent(text) {
+      responseContent.textContent = text;
+      scrollToBottom();
+    },
+
+    markCancelled() {
+      const badge = document.createElement("div");
+      badge.className = "status-badge-cancelled";
+      badge.textContent = "⏹ Generation stopped";
+      messageDiv.appendChild(badge);
+      scrollToBottom();
+    },
+
+    finalize() {
+      this.hidePromptProgress();
+      this.endThinking();
+      cursor.remove();
+    }
+  };
+}
+
+function cancelGeneration() {
+  if (activeAbortController) {
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
+}
+
+async function translateText(text, direction, aiUi) {
+  if (!text || !text.trim()) return text;
+
+  await ensureTranslatorLoaded({ key: translatorModelKey });
+
+  const prompt = direction === "PT_TO_EN"
+    ? `Translate to English:\n${text}`
+    : `Traduza para Português BR:\n${text}`;
+
+  const response = await fetch(`${LM_STUDIO_URL}/api/v1/chat`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({
+      model: translatorModelKey,
+      input: prompt,
+      temperature: 0.1,
+      stream: true
+    }),
+    signal: activeAbortController ? activeAbortController.signal : null
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Erro na tradução com Gemma 3 1B (HTTP ${response.status}): ${body}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let sseBuffer = "";
+  let currentEventType = null;
+  let resultBuffer = "";
+  let rawBuffer = "";
+  let isInlineThinking = false;
+  let activeCloseTag = "";
+
+  const tagPairs = [
+    { open: "<thought>", close: "</thought>" },
+    { open: "<think>", close: "</think>" },
+    { open: "<reasoning>", close: "</reasoning>" },
+    { open: "<reflection>", close: "</reflection>" }
+  ];
+
+  function extractReasoning(parsed, eventType) {
+    if (eventType && eventType.startsWith("reasoning")) {
+      return parsed.content ||
+             (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.content) ||
+             parsed.text || "";
+    }
+
+    return parsed.reasoning_content ||
+           parsed.delta?.reasoning_content ||
+           parsed.choices?.[0]?.delta?.reasoning_content ||
+           parsed.reasoning ||
+           parsed.delta?.reasoning ||
+           parsed.choices?.[0]?.delta?.reasoning ||
+           parsed.thought ||
+           parsed.delta?.thought || null;
+  }
+
+  function handleContentChunk(chunk) {
+    if (!chunk) return;
+    rawBuffer += chunk;
+
+    while (rawBuffer.length > 0) {
+      if (!isInlineThinking) {
+        let earliestIdx = -1;
+        let matchedPair = null;
+
+        for (const pair of tagPairs) {
+          const idx = rawBuffer.indexOf(pair.open);
+          if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
+            earliestIdx = idx;
+            matchedPair = pair;
+          }
+        }
+
+        if (earliestIdx !== -1) {
+          const before = rawBuffer.slice(0, earliestIdx);
+          if (before) resultBuffer += before;
+          aiUi.startThinking("Gemma 3 1B");
+          isInlineThinking = true;
+          activeCloseTag = matchedPair.close;
+          rawBuffer = rawBuffer.slice(earliestIdx + matchedPair.open.length);
+          continue;
+        }
+
+        let isPartial = false;
+        for (const pair of tagPairs) {
+          if (pair.open.startsWith(rawBuffer)) {
+            isPartial = true;
+            break;
+          }
+        }
+        if (isPartial) break;
+
+        resultBuffer += rawBuffer;
+        rawBuffer = "";
+      } else {
+        const endIdx = rawBuffer.indexOf(activeCloseTag);
+        if (endIdx !== -1) {
+          aiUi.appendThinking(rawBuffer.slice(0, endIdx));
+          aiUi.endThinking();
+          isInlineThinking = false;
+          rawBuffer = rawBuffer.slice(endIdx + activeCloseTag.length).trimStart();
+          continue;
+        }
+
+        if (activeCloseTag.startsWith(rawBuffer)) break;
+
+        aiUi.appendThinking(rawBuffer);
+        rawBuffer = "";
+      }
+    }
+  }
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    sseBuffer += decoder.decode(value, { stream: true });
+    const lines = sseBuffer.split("\n");
+    sseBuffer = lines.pop();
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.startsWith("event:")) {
+        currentEventType = trimmed.slice(6).trim();
+        continue;
+      }
+
+      if (!trimmed.startsWith("data:")) continue;
+      const jsonStr = trimmed.slice(5).trim();
+      if (jsonStr === "[DONE]") continue;
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const eventType = parsed.type || currentEventType;
+
+        const reasoningChunk = extractReasoning(parsed, eventType);
+        if (reasoningChunk) {
+          aiUi.startThinking("Gemma 3 1B"); 
+          aiUi.appendThinking(reasoningChunk);
+          continue;
+        }
+
+        if (eventType === "reasoning.end") {
+          aiUi.endThinking();
+          continue;
+        }
+
+        const content = parsed.content ||
+                        (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.content) ||
+                        parsed.choices?.[0]?.delta?.content || null;
+
+        if (content) handleContentChunk(content);
+      } catch (e) {}
+    }
+  }
+
+  if (rawBuffer) {
+    if (isInlineThinking) {
+      aiUi.appendThinking(rawBuffer);
+    } else {
+      resultBuffer += rawBuffer;
+    }
+  }
+  if (isInlineThinking) aiUi.endThinking();
+
+  const result = String(resultBuffer)
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
+    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
+    .replace(/<reflection>[\s\S]*?<\/reflection>/gi, "")
+    .trim();
+
+  if (!result) throw new Error("Gemma 3 1B retornou uma tradução vazia.");
+  return result;
+}
+
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!selectedModel || (pendingFiles.length === 0 && !text)) return;
+
+  const useTranslation = document.getElementById("translate-checkbox").checked;
+
+  input.value = "";
+  isGenerating = true;
+
+  send.textContent = "⏹ Cancel";
+  send.classList.add("cancel-state");
+  send.disabled = false;
+
+  const fileNames = pendingFiles.length > 0 ? pendingFiles.map(f => f.name).join(", ") : "";
+  const displayMsg = text + (fileNames ? `\n\n📎 Attached files: ${fileNames}` : "");
+  addMessage(displayMsg, "user");
+  
+  const aiUi = createAiMessagePlaceholder();
+
+  let rawBuffer = "";
+  let isInlineThinking = false;
+  let activeOpenTag = "";
+  let activeCloseTag = "";
+
+  const tagPairs = [
+    { open: "<thought>", close: "</thought>" },
+    { open: "<think>", close: "</think>" },
+    { open: "<reasoning>", close: "</reasoning>" },
+    { open: "<reflection>", close: "</reflection>" }
+  ];
+
+  activeAbortController = new AbortController();
+
+  try {
+    let promptToUse = text;
+
+    if (useTranslation && text.length > 0) {
+      setStatus("⏳ Traduzindo pergunta para Inglês (Gemma 3 1B)...");
+      aiUi.showToolCall("Tradução (PT-BR ➔ EN)", "Gemma 3 1B em execução...");
+      
+      promptToUse = await translateText(text, "PT_TO_EN", aiUi);
+      if (!promptToUse || !promptToUse.trim()) {
+        promptToUse = text;
+      }
+      aiUi.completeToolCall("Tradução PT-BR ➔ EN");
+      
+      aiUi.setInternalPrompt(promptToUse);
+    }
+
+    // Upload ORIGINAL file bytes through the network.
+    // The server extracts PDF/TXT/etc. and can return image data URLs.
+    let uploadedFiles = { text: "", images: [] };
+
+    if (pendingFiles.length > 0) {
+      setStatus("⏳ Uploading attached files...");
+      aiUi.showToolCall(
+        "File upload",
+        "Sending files through network..."
+      );
+
+      uploadedFiles = await uploadFilesToServer();
+
+      aiUi.completeToolCall("File upload");
+
+      if (uploadedFiles.text) {
+        promptToUse =
+          `${uploadedFiles.text}\n\nUser Request:\n${promptToUse}`;
+      }
+
+      pendingFiles = [];
+      renderFilePreview();
+    }
+
+    setStatus(`⏳ Processando no modelo ${selectedModel}...`);
+    aiUi.showToolCall(`Processando no modelo (${selectedModel})`, "Aguardando resposta...");
+    
+    let mainResponseBuffer = "";
+
+    const systemPromptContent = useTranslation
+      ? "Answer the user's request. The input has already been translated to English. Respond in English only; do not translate the user's request and do not act as a translation engine."
+      : "Answer the user's request.";
+
+    // LM Studio v1 accepts text plus image inputs in an input array.
+    const chatInput = uploadedFiles.images.length > 0
+      ? [
+          { type: "message", content: promptToUse },
+          ...uploadedFiles.images.map(image => ({
+            type: "image",
+            data_url: image.data_url
+          }))
+        ]
+      : promptToUse;
+
+    const requestBody = {
+      model: selectedModel,
+      input: chatInput,
+      system_prompt: systemPromptContent,
+      context_length: 8000,
+      temperature: 0.7,
+      store: true,
+      stream: true,
+      ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
+      integrations: [
+        {
+          type: "ephemeral_mcp",
+          server_label: "huggingface",
+          server_url: "https://huggingface.co/mcp",
+          allowed_tools: ["hub_repo_search"]
+        }
+      ]
+    };
+
+    const response = await fetch(`${LM_STUDIO_URL}/api/v1/chat`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(requestBody),
+      signal: activeAbortController.signal
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ` + await response.text());
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let streamDone = false;
+    let sseBuffer = "";
+    let currentEventType = null;
+
+    function extractReasoning(parsed, eventType) {
+      if (eventType && eventType.startsWith("reasoning")) {
+        return parsed.content ||
+               (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.content) ||
+               parsed.text || "";
+      }
+
+      return parsed.reasoning_content ||
+             parsed.delta?.reasoning_content ||
+             parsed.choices?.[0]?.delta?.reasoning_content ||
+             parsed.reasoning ||
+             parsed.delta?.reasoning ||
+             parsed.choices?.[0]?.delta?.reasoning ||
+             parsed.thought ||
+             parsed.delta?.thought || null;
+    }
+
+    function handleContentChunk(chunk) {
+      if (!chunk) return;
+      rawBuffer += chunk;
+
+      while (rawBuffer.length > 0) {
+        if (!isInlineThinking) {
+          let earliestIdx = -1;
+          let matchedPair = null;
+
+          for (const pair of tagPairs) {
+            const idx = rawBuffer.indexOf(pair.open);
+            if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
+              earliestIdx = idx;
+              matchedPair = pair;
+            }
+          }
+
+          if (earliestIdx !== -1) {
+            const before = rawBuffer.slice(0, earliestIdx);
+            if (before) {
+              mainResponseBuffer += before;
+              if (useTranslation) aiUi.appendInternalResponse(before); 
+              else aiUi.appendContent(before);
+            }
+            aiUi.startThinking(selectedModel);
+            isInlineThinking = true;
+            activeOpenTag = matchedPair.open;
+            activeCloseTag = matchedPair.close;
+            rawBuffer = rawBuffer.slice(earliestIdx + activeOpenTag.length);
+            continue;
+          }
+
+          let isPartial = false;
+          for (const pair of tagPairs) {
+            if (pair.open.startsWith(rawBuffer)) {
+              isPartial = true;
+              break;
+            }
+          }
+          if (isPartial) break;
+
+          mainResponseBuffer += rawBuffer; 
+          if (useTranslation) aiUi.appendInternalResponse(rawBuffer); 
+          else aiUi.appendContent(rawBuffer);
+          
+          rawBuffer = "";
+        } else {
+          const endIdx = rawBuffer.indexOf(activeCloseTag);
+          if (endIdx !== -1) {
+            aiUi.appendThinking(rawBuffer.slice(0, endIdx));
+            aiUi.endThinking();
+            isInlineThinking = false;
+            rawBuffer = rawBuffer.slice(endIdx + activeCloseTag.length).trimStart();
+            continue;
+          }
+
+          if (activeCloseTag.startsWith(rawBuffer)) break;
+
+          aiUi.appendThinking(rawBuffer);
+          rawBuffer = "";
+        }
+      }
+    }
+
+    while (!streamDone) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      sseBuffer += decoder.decode(value, { stream: true });
+      const lines = sseBuffer.split("\n");
+      sseBuffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (trimmed.startsWith("event:")) {
+          currentEventType = trimmed.slice(6).trim();
+          continue;
+        }
+
+        if (!trimmed.startsWith("data:")) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (jsonStr === "[DONE]") {
+          streamDone = true;
+          break;
+        }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const eventType = parsed.type || currentEventType;
+
+          if (parsed.response_id) previousResponseId = parsed.response_id;
+          if (parsed.stats) {
+            setStatus(`✓ ${selectedModel} | ${parsed.stats.tokens_per_second?.toFixed(1) || "?"} tok/s`);
+          }
+
+          if (eventType === "prompt_processing.progress") {
+            const pct = Math.round((parsed.progress || 0) * 100);
+            aiUi.showPromptProgress(pct);
+            continue;
+          } else if (eventType === "prompt_processing.end") {
+            aiUi.hidePromptProgress();
+            continue;
+          }
+
+          if (eventType === "tool_call.start") {
+            aiUi.showToolCall(parsed.tool || "mcp_tool", "running...");
+            continue;
+          } else if (eventType === "tool_call.success") {
+            aiUi.completeToolCall(parsed.tool || "mcp_tool");
+            continue;
+          }
+
+          const reasoningChunk = extractReasoning(parsed, eventType);
+          if (reasoningChunk) {
+            aiUi.hidePromptProgress();
+            aiUi.startThinking(selectedModel);
+            aiUi.appendThinking(reasoningChunk);
+            continue;
+          }
+
+          if (eventType === "reasoning.end") {
+            aiUi.endThinking();
+            continue;
+          }
+
+          let content = parsed.content ||
+                        (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.content) ||
+                        parsed.choices?.[0]?.delta?.content || null;
+
+          if (content) {
+            aiUi.hidePromptProgress();
+            handleContentChunk(content);
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (rawBuffer) {
+      if (isInlineThinking) {
+        aiUi.appendThinking(rawBuffer);
+      } else {
+        mainResponseBuffer += rawBuffer;
+        if (useTranslation) aiUi.appendInternalResponse(rawBuffer);
+        else aiUi.appendContent(rawBuffer);
+      }
+    }
+
+    aiUi.completeToolCall(`Resposta gerada (${selectedModel})`);
+
+    if (mainResponseBuffer && mainResponseBuffer.trim().length > 0) {
+      if (useTranslation) {
+        setStatus("⏳ Traduzindo resposta para Português (Gemma 3 1B)...");
+        aiUi.showToolCall("Tradução (EN ➔ PT-BR)", "Gemma 3 1B em execução...");
+        
+        const ptResponse = await translateText(mainResponseBuffer, "EN_TO_PT", aiUi);
+        aiUi.completeToolCall("Tradução EN ➔ PT-BR");
+        
+        aiUi.setContent(ptResponse);
+      }
+      setStatus(`✓ Concluído`);
+    }
+
+  } catch (error) {
+    if (error.name === "AbortError") {
+      aiUi.markCancelled();
+      setStatus(`✓ Stopped generation`);
+    } else {
+      aiUi.appendContent("\n❌ Error:\n\n" + error.message);
+    }
+  } finally {
+    aiUi.finalize();
+    activeAbortController = null;
+    isGenerating = false;
+
+    send.textContent = "Send";
+    send.classList.remove("cancel-state");
+    send.disabled = false;
+    input.focus();
+  }
+}
+
+changeModel.addEventListener("click", async () => {
+  cancelGeneration();
+  previousResponseId = null;
+  selectedModel = null;
+  chat.innerHTML = "";
+  chat.style.display = "none";
+  inputArea.style.display = "none";
+  changeModel.style.display = "none";
+  modelMenu.style.display = "block";
+  setStatus("Refreshing models...");
+  await loadModels();
+});
+
+send.addEventListener("click", () => {
+  if (isGenerating) {
+    cancelGeneration();
+  } else {
+    sendMessage();
+  }
+});
+
+loadModels();
+</script>
+
+</body>
+</html>
