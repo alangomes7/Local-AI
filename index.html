@@ -1,1616 +1,3871 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Local AI Chat</title>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+    <title>Local AI Math & Vision IDE</title>
 
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #f8fafc;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+    <style>
+        :root {
+            --bg: #0b0f14;
+            --bg-secondary: #111821;
+            --bg-tertiary: #17202b;
+            --panel: #101720;
+            --panel-hover: #18232f;
+            --border: #273443;
+            --text: #e7edf4;
+            --text-secondary: #9ba9b8;
+            --muted: #667687;
 
-    header {
-      background: #0f172a;
-      color: white;
-      padding: 14px 20px;
-      text-align: center;
-      border-bottom: 1px solid #1e293b;
-    }
+            --primary: #6ea8fe;
+            --primary-hover: #8bb9ff;
 
-    #model {
-      font-size: 13px;
-      color: #94a3b8;
-      margin-top: 4px;
-    }
+            --success: #4ade80;
+            --warning: #facc15;
+            --danger: #f87171;
+            --info: #38bdf8;
 
-    #status {
-      font-size: 12px;
-      margin-top: 4px;
-      color: #38bdf8;
-    }
+            --radius: 10px;
+            --radius-small: 6px;
+        }
 
-    #model-menu {
-      padding: 24px;
-      max-width: 600px;
-      width: 100%;
-      margin: auto;
-    }
+        * {
+            box-sizing: border-box;
+        }
 
-    #model-menu h2 {
-      text-align: center;
-      color: #0f172a;
-      margin-bottom: 18px;
-    }
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
 
-    .model-button {
-      display: block;
-      width: 100%;
-      margin: 10px 0;
-      padding: 14px 18px;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      background: white;
-      color: #0f172a;
-      font-size: 15px;
-      font-weight: 500;
-      text-align: left;
-      cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      transition: all 0.2s ease;
-    }
+        body {
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
 
-    .model-button:hover {
-      background: #f1f5f9;
-      border-color: #cbd5e1;
-    }
+            background: var(--bg);
+            color: var(--text);
+        }
 
-    .model-button:disabled {
-      opacity: 0.6;
-      cursor: wait;
-    }
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit;
+        }
 
-    .loaded {
-      background: #f0fdf4;
-      border-color: #86efac;
-      color: #166534;
-    }
+        button {
+            cursor: pointer;
+        }
 
-    #chat {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px 15px;
-      max-width: 900px;
-      width: 100%;
-      margin: auto;
-      display: none;
-    }
+        /* =========================================================
+           APP LAYOUT
+           ========================================================= */
 
-    .message {
-      margin: 14px 0;
-      padding: 14px 18px;
-      border-radius: 14px;
-      max-width: 88%;
-      line-height: 1.6;
-      word-break: break-word;
-    }
+        .app {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            height: 100vh;
+            width: 100vw;
+        }
 
-    .user {
-      background: #0284c7;
-      color: white;
-      margin-left: auto;
-      white-space: pre-wrap;
-    }
+        /* =========================================================
+           SIDEBAR
+           ========================================================= */
 
-    .ai {
-      background: white;
-      border: 1px solid #e2e8f0;
-      color: #0f172a;
-      margin-right: auto;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-      width: 100%;
-    }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            border-right: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
 
-    .system {
-      background: #f1f5f9;
-      color: #64748b;
-      margin: 10px auto;
-      text-align: center;
-      font-size: 13px;
-      padding: 8px 14px;
-      white-space: pre-wrap;
-    }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
 
-    .progress-box {
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: 12px;
-      display: none;
-    }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-    .progress-header {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      font-weight: 600;
-      color: #475569;
-      margin-bottom: 6px;
-    }
+        .brand-icon {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 9px;
+            background: var(--primary);
+            color: #08101a;
+            font-weight: 800;
+        }
 
-    .progress-track {
-      width: 100%;
-      height: 6px;
-      background: #e2e8f0;
-      border-radius: 4px;
-      overflow: hidden;
-    }
+        .brand-title {
+            font-size: 15px;
+            font-weight: 700;
+        }
 
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      background: #0284c7;
-      transition: width 0.2s ease;
-    }
+        .brand-subtitle {
+            margin-top: 2px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
 
-    .thinking-wrapper {
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      margin-bottom: 14px;
-      overflow: hidden;
-      font-size: 13px;
-      display: none;
-    }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
 
-    .thinking-header {
-      padding: 10px 14px;
-      background: #f1f5f9;
-      color: #334155;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-      border-bottom: 1px solid #e2e8f0;
-      transition: background 0.15s ease;
-    }
+        .section {
+            margin-bottom: 22px;
+        }
 
-    .thinking-header:hover {
-      background: #e2e8f0;
-    }
+        .section-title {
+            margin-bottom: 9px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
 
-    .thinking-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        .field {
+            margin-bottom: 12px;
+        }
 
-    .pulse-dot {
-      width: 9px;
-      height: 9px;
-      background: #0284c7;
-      border-radius: 50%;
-      animation: pulse 1.2s infinite ease-in-out;
-    }
+        .field-label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
 
-    @keyframes pulse {
-      0% { transform: scale(0.8); opacity: 0.4; }
-      50% { transform: scale(1.3); opacity: 1; }
-      100% { transform: scale(0.8); opacity: 0.4; }
-    }
+        .input,
+        .select,
+        .textarea {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-small);
+            outline: none;
+            background: var(--bg);
+            color: var(--text);
+            transition:
+                border-color 0.15s ease,
+                background 0.15s ease;
+        }
 
-    .thinking-content {
-      padding: 14px;
-      color: #334155;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12.5px;
-      white-space: pre-wrap;
-      max-height: 380px;
-      overflow-y: auto;
-      line-height: 1.55;
-      background: #fcfcfd;
-    }
+        .input,
+        .select {
+            height: 38px;
+            padding: 0 10px;
+        }
 
-    .thinking-content.collapsed {
-      display: none;
-    }
+        .textarea {
+            min-height: 120px;
+            padding: 10px;
+            resize: vertical;
+        }
 
-    .internal-wrapper {
-      background: #fafaf9;
-      border: 1px solid #d6d3d1;
-      border-radius: 8px;
-      margin-bottom: 14px;
-      overflow: hidden;
-      font-size: 13px;
-      display: none; 
-    }
+        .input:focus,
+        .select:focus,
+        .textarea:focus {
+            border-color: var(--primary);
+            background: #0d141c;
+        }
 
-    .internal-header {
-      padding: 10px 14px;
-      background: #f5f5f4;
-      color: #44403c;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-      border-bottom: 1px solid #d6d3d1;
-      transition: background 0.15s ease;
-    }
+        .server-row {
+            display: flex;
+            gap: 6px;
+        }
 
-    .internal-header:hover {
-      background: #e7e5e4;
-    }
+        .server-row .input {
+            min-width: 0;
+            flex: 1;
+        }
 
-    .internal-content {
-      padding: 14px;
-      color: #44403c;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12.5px;
-      white-space: pre-wrap;
-      max-height: 380px;
-      overflow-y: auto;
-      line-height: 1.55;
-      background: #fafaf9;
-    }
+        .icon-button {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 38px;
 
-    .internal-content.collapsed {
-      display: none;
-    }
+            border: 1px solid var(--border);
+            border-radius: var(--radius-small);
 
-    .internal-divider {
-      margin: 12px 0;
-      border-top: 1px dashed #d6d3d1;
-    }
+            background: var(--bg);
+            color: var(--text-secondary);
 
-    .internal-label {
-      font-weight: 700;
-      color: #78716c;
-      margin-bottom: 6px;
-      display: block;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+            display: grid;
+            place-items: center;
+        }
 
-    .tool-box {
-      background: #fefce8;
-      border: 1px solid #fef08a;
-      border-radius: 8px;
-      padding: 9px 13px;
-      margin-bottom: 12px;
-      font-size: 12.5px;
-      color: #854d0e;
-      display: none;
-    }
+        .icon-button:hover {
+            background: var(--panel-hover);
+            color: var(--text);
+        }
 
-    .tool-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-weight: 600;
-    }
+        .server-status {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 7px;
+            min-height: 18px;
 
-    .response-content {
-      white-space: pre-wrap;
-      line-height: 1.6;
-    }
+            color: var(--muted);
+            font-size: 11px;
+        }
 
-    .status-badge-cancelled {
-      display: inline-block;
-      margin-top: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: #b91c1c;
-      background: #fee2e2;
-      border: 1px solid #fca5a5;
-      padding: 3px 8px;
-      border-radius: 6px;
-    }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 8px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
 
-    .cursor {
-      display: inline-block;
-      width: 6px;
-      height: 15px;
-      background: #0284c7;
-      margin-left: 3px;
-      vertical-align: middle;
-      animation: blink 0.8s infinite;
-    }
+        .status-dot.online {
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+        }
 
-    @keyframes blink {
-      0%, 100% { opacity: 0; }
-      50% { opacity: 1; }
-    }
+        .status-dot.offline {
+            background: var(--danger);
+        }
 
-    #input-area {
-      display: none;
-      flex-direction: column;
-      padding: 14px 20px;
-      background: white;
-      border-top: 1px solid #e2e8f0;
-      max-width: 900px;
-      width: 100%;
-      margin: 0 auto;
-    }
+        .status-dot.loading {
+            background: var(--warning);
+            animation: pulse 1s infinite;
+        }
 
-    .translation-toggle {
-      font-size: 13px;
-      color: #64748b;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-      user-select: none;
-    }
+        .status-dot.warning {
+            background: var(--warning);
+        }
 
-    .translation-toggle input {
-      margin-right: 8px;
-      cursor: pointer;
-    }
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 0.4;
+            }
 
-    /* File Preview Styles */
-    #file-preview-container {
-      display: none;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
+            50% {
+                opacity: 1;
+            }
+        }
 
-    .file-badge {
-      background: #f1f5f9;
-      color: #334155;
-      border: 1px solid #cbd5e1;
-      padding: 5px 10px;
-      border-radius: 8px;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
+        .server-help {
+            margin-top: 5px;
+            color: var(--muted);
+            font-size: 10px;
+            line-height: 1.4;
+        }
 
-    .file-remove {
-      cursor: pointer;
-      font-weight: bold;
-      color: #94a3b8;
-      font-size: 14px;
-      transition: color 0.15s;
-    }
-    
-    .file-remove:hover {
-      color: #ef4444;
-    }
+        .button {
+            width: 100%;
+            min-height: 38px;
+            padding: 0 12px;
 
-    .input-row {
-      display: flex;
-      width: 100%;
-      align-items: flex-end;
-      gap: 10px;
-    }
+            border: 1px solid var(--border);
+            border-radius: var(--radius-small);
 
-    #attach-btn {
-      background: transparent;
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 18px;
-      color: #64748b;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s;
-    }
+            background: var(--bg-tertiary);
+            color: var(--text);
 
-    #attach-btn:hover {
-      background: #f1f5f9;
-      color: #0284c7;
-      border-color: #94a3b8;
-    }
+            transition:
+                background 0.15s ease,
+                border-color 0.15s ease,
+                transform 0.05s ease;
+        }
 
-    #input {
-      flex: 1;
-      padding: 12px 14px;
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      font-size: 15px;
-      resize: none;
-      font-family: inherit;
-      outline: none;
-    }
+        .button:hover {
+            background: var(--panel-hover);
+            border-color: #3b4b5e;
+        }
 
-    #input:focus {
-      border-color: #0284c7;
-      box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
-    }
+        .button:active {
+            transform: translateY(1px);
+        }
 
-    #send {
-      padding: 0 22px;
-      height: 46px;
-      border: none;
-      border-radius: 10px;
-      background: #0f172a;
-      color: white;
-      font-size: 15px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s active;
-    }
+        .button.primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #07111e;
+            font-weight: 700;
+        }
 
-    #send:hover {
-      background: #1e293b;
-    }
+        .button.primary:hover {
+            background: var(--primary-hover);
+        }
 
-    #send.cancel-state {
-      background: #dc2626;
-    }
+        .button.small {
+            min-height: 32px;
+            font-size: 12px;
+        }
 
-    #send.cancel-state:hover {
-      background: #b91c1c;
-    }
+        .button.danger {
+            color: var(--danger);
+        }
 
-    #change-model {
-      display: none;
-      margin: 12px auto;
-      padding: 6px 14px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      background: white;
-      font-size: 13px;
-      cursor: pointer;
-      color: #475569;
-    }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 9px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
 
-    #change-model:hover {
-      background: #f1f5f9;
-    }
-  </style>
+        .checkbox-row input {
+            accent-color: var(--primary);
+        }
+
+        .sidebar-footer {
+            padding: 14px 16px;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 10px;
+            line-height: 1.5;
+        }
+
+        /* =========================================================
+           MAIN
+           ========================================================= */
+
+        .main {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+
+            min-height: 64px;
+            padding: 0 20px;
+
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .topbar-title {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .topbar-subtitle {
+            margin-top: 3px;
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .connection-summary {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .summary-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .workspace {
+            flex: 1;
+            min-height: 0;
+
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .panel {
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel + .panel {
+            border-left: 1px solid var(--border);
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+
+            min-height: 48px;
+            padding: 0 16px;
+
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .panel-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        /* =========================================================
+           INPUT AREA
+           ========================================================= */
+
+        .dropzone {
+            border: 1px dashed #3a4b5e;
+            border-radius: var(--radius);
+            padding: 22px;
+
+            text-align: center;
+
+            background: rgba(255, 255, 255, 0.015);
+
+            transition:
+                border-color 0.15s ease,
+                background 0.15s ease;
+        }
+
+        .dropzone.dragover {
+            border-color: var(--primary);
+            background: rgba(110, 168, 254, 0.08);
+        }
+
+        .dropzone-icon {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+
+        .dropzone-title {
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .dropzone-text {
+            margin-top: 5px;
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .dropzone input {
+            display: none;
+        }
+
+        .attachment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .attachment {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            padding: 8px 10px;
+
+            border: 1px solid var(--border);
+            border-radius: var(--radius-small);
+
+            background: var(--bg-secondary);
+
+            font-size: 11px;
+        }
+
+        .attachment-name {
+            flex: 1;
+            min-width: 0;
+
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .attachment-remove {
+            border: 0;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+        }
+
+        .attachment-remove:hover {
+            color: var(--danger);
+        }
+
+        .problem-area {
+            margin-top: 14px;
+        }
+
+        .problem-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 7px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .character-count {
+            color: var(--muted);
+            font-weight: 400;
+        }
+
+        /* =========================================================
+           WORKFLOW
+           ========================================================= */
+
+        .workflow {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .workflow-step {
+            display: grid;
+            grid-template-columns: 30px 1fr auto;
+            gap: 10px;
+            align-items: start;
+
+            padding: 10px;
+
+            border: 1px solid var(--border);
+            border-radius: var(--radius-small);
+
+            background: var(--bg-secondary);
+        }
+
+        .step-number {
+            width: 26px;
+            height: 26px;
+
+            display: grid;
+            place-items: center;
+
+            border-radius: 50%;
+
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .workflow-step.running .step-number {
+            background: var(--warning);
+            color: #17120a;
+        }
+
+        .workflow-step.complete .step-number {
+            background: var(--success);
+            color: #06130a;
+        }
+
+        .workflow-step.error .step-number {
+            background: var(--danger);
+            color: #1a0505;
+        }
+
+        .step-title {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .step-description {
+            margin-top: 3px;
+            color: var(--text-secondary);
+            font-size: 10px;
+            line-height: 1.45;
+        }
+
+        .step-status {
+            color: var(--muted);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        /* =========================================================
+           RESULT
+           ========================================================= */
+
+        .result-container {
+            margin-top: 15px;
+        }
+
+        .result-card {
+            padding: 15px;
+
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+
+            background: var(--bg-secondary);
+        }
+
+        .result-card h1,
+        .result-card h2,
+        .result-card h3 {
+            margin-top: 0;
+        }
+
+        .result-card p {
+            line-height: 1.6;
+        }
+
+        .result-card pre {
+            overflow-x: auto;
+            padding: 12px;
+            border-radius: var(--radius-small);
+            background: #080c11;
+        }
+
+        .result-card code {
+            font-family:
+                "Cascadia Code",
+                "Fira Code",
+                Consolas,
+                monospace;
+            font-size: 12px;
+        }
+
+        .empty-state {
+            display: grid;
+            place-items: center;
+            min-height: 300px;
+
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 42px;
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+
+        .empty-state-title {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .empty-state-description {
+            max-width: 350px;
+            margin-top: 6px;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        /* =========================================================
+           BOTTOM BAR
+           ========================================================= */
+
+        .bottom-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            min-height: 68px;
+            padding: 12px 16px;
+
+            border-top: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .bottom-info {
+            flex: 1;
+            min-width: 0;
+
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .bottom-info strong {
+            color: var(--text);
+        }
+
+        .solve-button {
+            width: 160px;
+        }
+
+        /* =========================================================
+           LOG
+           ========================================================= */
+
+        .log {
+            max-height: 180px;
+            overflow-y: auto;
+
+            margin-top: 12px;
+            padding: 10px;
+
+            border: 1px solid var(--border);
+            border-radius: var(--radius-small);
+
+            background: #080c11;
+
+            font-family:
+                "Cascadia Code",
+                Consolas,
+                monospace;
+
+            font-size: 10px;
+            line-height: 1.5;
+        }
+
+        .log-line {
+            margin-bottom: 3px;
+        }
+
+        .log-time {
+            color: var(--muted);
+        }
+
+        .log-info {
+            color: var(--text-secondary);
+        }
+
+        .log-success {
+            color: var(--success);
+        }
+
+        .log-warning {
+            color: var(--warning);
+        }
+
+        .log-error {
+            color: var(--danger);
+        }
+
+        /* =========================================================
+           TOAST
+           ========================================================= */
+
+        .toast-container {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+
+            z-index: 1000;
+
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            min-width: 280px;
+            max-width: 400px;
+
+            padding: 12px 14px;
+
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+
+            background: #121a23;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
+
+            font-size: 12px;
+
+            animation: toast-in 0.2s ease-out;
+        }
+
+        @keyframes toast-in {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .toast.success {
+            border-color: rgba(74, 222, 128, 0.35);
+        }
+
+        .toast.error {
+            border-color: rgba(248, 113, 113, 0.35);
+        }
+
+        .toast.warning {
+            border-color: rgba(250, 204, 21, 0.35);
+        }
+
+        /* =========================================================
+           RESPONSIVE
+           ========================================================= */
+
+        @media (max-width: 1000px) {
+            .app {
+                grid-template-columns: 250px 1fr;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            .panel + .panel {
+                border-left: 0;
+                border-top: 1px solid var(--border);
+            }
+        }
+
+        @media (max-width: 750px) {
+            html,
+            body {
+                overflow: auto;
+            }
+
+            .app {
+                display: flex;
+                flex-direction: column;
+                min-height: 100vh;
+            }
+
+            .sidebar {
+                border-right: 0;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .sidebar-content {
+                max-height: 500px;
+            }
+
+            .main {
+                min-height: 700px;
+            }
+
+            .connection-summary {
+                display: none;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<header>
-  🧠 Local AI
-  <div id="model">Loading models...</div>
-  <div id="status">Connecting...</div>
-</header>
+<div class="app">
 
-<div id="model-menu">
-  <h2>Select a main model</h2>
-  <div id="models"></div>
+    <!-- =========================================================
+         SIDEBAR
+         ========================================================= -->
+
+    <aside class="sidebar">
+
+        <div class="sidebar-header">
+            <div class="brand">
+                <div class="brand-icon">AI</div>
+
+                <div>
+                    <div class="brand-title">
+                        Local AI IDE
+                    </div>
+
+                    <div class="brand-subtitle">
+                        Vision + Mathematics
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-content">
+
+            <!-- =================================================
+                 VISION SERVER
+                 ================================================= -->
+
+            <section class="section">
+
+                <div class="section-title">
+                    Vision Server
+                </div>
+
+                <div class="field">
+
+                    <label
+                        class="field-label"
+                        for="vision-server"
+                    >
+                        Server address
+                    </label>
+
+                    <div class="server-row">
+
+                        <input
+                            id="vision-server"
+                            class="input"
+                            type="text"
+                            placeholder="http://localhost:8002"
+                            autocomplete="off"
+                            spellcheck="false"
+                        >
+
+                        <button
+                            id="test-vision"
+                            class="icon-button"
+                            title="Test Vision server"
+                        >
+                            ↻
+                        </button>
+
+                    </div>
+
+                    <div
+                        id="vision-status"
+                        class="server-status"
+                    >
+                        <span class="status-dot"></span>
+                        <span>Not tested</span>
+                    </div>
+
+                    <div class="server-help">
+                        Example:
+                        http://localhost:8002
+                    </div>
+
+                </div>
+
+                <div class="field">
+
+                    <label
+                        class="field-label"
+                        for="vision-model"
+                    >
+                        Vision model
+                    </label>
+
+                    <select
+                        id="vision-model"
+                        class="select"
+                    >
+                        <option value="">
+                            Discovering models...
+                        </option>
+                    </select>
+
+                </div>
+
+            </section>
+
+            <!-- =================================================
+                 MATH SERVER
+                 ================================================= -->
+
+            <section class="section">
+
+                <div class="section-title">
+                    Math Server
+                </div>
+
+                <div class="field">
+
+                    <label
+                        class="field-label"
+                        for="math-server"
+                    >
+                        Server address
+                    </label>
+
+                    <div class="server-row">
+
+                        <input
+                            id="math-server"
+                            class="input"
+                            type="text"
+                            placeholder="http://localhost:8001"
+                            autocomplete="off"
+                            spellcheck="false"
+                        >
+
+                        <button
+                            id="test-math"
+                            class="icon-button"
+                            title="Test Math server"
+                        >
+                            ↻
+                        </button>
+
+                    </div>
+
+                    <div
+                        id="math-status"
+                        class="server-status"
+                    >
+                        <span class="status-dot"></span>
+                        <span>Not tested</span>
+                    </div>
+
+                    <div class="server-help">
+                        Example:
+                        http://localhost:8001
+                    </div>
+
+                </div>
+
+                <div class="field">
+
+                    <label
+                        class="field-label"
+                        for="math-model"
+                    >
+                        Math model
+                    </label>
+
+                    <select
+                        id="math-model"
+                        class="select"
+                    >
+                        <option value="">
+                            Discovering models...
+                        </option>
+                    </select>
+
+                </div>
+
+            </section>
+
+            <!-- =================================================
+                 GENERATION
+                 ================================================= -->
+
+            <section class="section">
+
+                <div class="section-title">
+                    Generation
+                </div>
+
+                <div class="field">
+
+                    <label
+                        class="field-label"
+                        for="temperature"
+                    >
+                        Temperature
+                    </label>
+
+                    <input
+                        id="temperature"
+                        class="input"
+                        type="number"
+                        min="0"
+                        max="2"
+                        step="0.05"
+                    >
+
+                </div>
+
+                <div class="field">
+
+                    <label
+                        class="field-label"
+                        for="max-tokens"
+                    >
+                        Maximum tokens
+                    </label>
+
+                    <input
+                        id="max-tokens"
+                        class="input"
+                        type="number"
+                        min="128"
+                        max="32768"
+                        step="128"
+                    >
+
+                </div>
+
+                <label class="checkbox-row">
+
+                    <input
+                        id="show-thinking"
+                        type="checkbox"
+                    >
+
+                    <span>
+                        Show reasoning / thinking
+                    </span>
+
+                </label>
+
+            </section>
+
+            <!-- =================================================
+                 ACTIONS
+                 ================================================= -->
+
+            <section class="section">
+
+                <button
+                    id="save-settings"
+                    class="button small"
+                >
+                    Save settings
+                </button>
+
+                <div style="height: 7px;"></div>
+
+                <button
+                    id="test-all"
+                    class="button small"
+                >
+                    Test all servers
+                </button>
+
+                <div style="height: 7px;"></div>
+
+                <button
+                    id="clear-settings"
+                    class="button small danger"
+                >
+                    Clear saved settings
+                </button>
+
+            </section>
+
+        </div>
+
+        <div class="sidebar-footer">
+
+            All inference runs against the servers you specify.
+            No model is downloaded by this browser application.
+
+        </div>
+
+    </aside>
+
+
+    <!-- =========================================================
+         MAIN
+         ========================================================= -->
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <div>
+
+                <div class="topbar-title">
+                    Mathematics Problem Solver
+                </div>
+
+                <div class="topbar-subtitle">
+                    Image → Vision → Normalized problem → Math → Final answer
+                </div>
+
+            </div>
+
+            <div class="connection-summary">
+
+                <div class="summary-item">
+                    <span
+                        id="summary-vision-dot"
+                        class="status-dot"
+                    ></span>
+
+                    Vision
+                </div>
+
+                <div class="summary-item">
+                    <span
+                        id="summary-math-dot"
+                        class="status-dot"
+                    ></span>
+
+                    Math
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <div class="workspace">
+
+            <!-- =================================================
+                 INPUT PANEL
+                 ================================================= -->
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div class="panel-title">
+                        <span>📥</span>
+                        Input
+                    </div>
+
+                    <button
+                        id="clear-input"
+                        class="button small"
+                        style="width:auto;"
+                    >
+                        Clear
+                    </button>
+
+                </div>
+
+                <div class="panel-body">
+
+                    <div
+                        id="dropzone"
+                        class="dropzone"
+                    >
+
+                        <div class="dropzone-icon">
+                            🖼️
+                        </div>
+
+                        <div class="dropzone-title">
+                            Add an image
+                        </div>
+
+                        <div class="dropzone-text">
+                            Drag & drop an image here or click to browse
+                        </div>
+
+                        <input
+                            id="file-input"
+                            type="file"
+                            accept="image/*,.txt,.pdf"
+                            multiple
+                        >
+
+                    </div>
+
+                    <div
+                        id="attachment-list"
+                        class="attachment-list"
+                    ></div>
+
+
+                    <div class="problem-area">
+
+                        <div class="problem-label">
+
+                            <span>
+                                Problem / additional instructions
+                            </span>
+
+                            <span
+                                id="character-count"
+                                class="character-count"
+                            >
+                                0 characters
+                            </span>
+
+                        </div>
+
+                        <textarea
+                            id="problem-input"
+                            class="textarea"
+                            placeholder="Type a mathematics problem, add instructions, or leave empty if the problem is contained in the image..."
+                        ></textarea>
+
+                    </div>
+
+
+                    <div class="problem-area">
+
+                        <div class="problem-label">
+                            <span>
+                                Workflow
+                            </span>
+                        </div>
+
+                        <div class="workflow">
+
+                            <div
+                                id="step-1"
+                                class="workflow-step"
+                            >
+
+                                <div class="step-number">
+                                    1
+                                </div>
+
+                                <div>
+
+                                    <div class="step-title">
+                                        Vision extraction
+                                    </div>
+
+                                    <div class="step-description">
+                                        Read the image and extract the mathematical problem.
+                                    </div>
+
+                                </div>
+
+                                <div
+                                    id="step-1-status"
+                                    class="step-status"
+                                >
+                                    Waiting
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                id="step-2"
+                                class="workflow-step"
+                            >
+
+                                <div class="step-number">
+                                    2
+                                </div>
+
+                                <div>
+
+                                    <div class="step-title">
+                                        Problem normalization
+                                    </div>
+
+                                    <div class="step-description">
+                                        Convert the problem into a clean mathematical representation.
+                                    </div>
+
+                                </div>
+
+                                <div
+                                    id="step-2-status"
+                                    class="step-status"
+                                >
+                                    Waiting
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                id="step-3"
+                                class="workflow-step"
+                            >
+
+                                <div class="step-number">
+                                    3
+                                </div>
+
+                                <div>
+
+                                    <div class="step-title">
+                                        Mathematical reasoning
+                                    </div>
+
+                                    <div class="step-description">
+                                        Send the normalized problem to the dedicated math server.
+                                    </div>
+
+                                </div>
+
+                                <div
+                                    id="step-3-status"
+                                    class="step-status"
+                                >
+                                    Waiting
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                id="step-4"
+                                class="workflow-step"
+                            >
+
+                                <div class="step-number">
+                                    4
+                                </div>
+
+                                <div>
+
+                                    <div class="step-title">
+                                        Final response
+                                    </div>
+
+                                    <div class="step-description">
+                                        Format the mathematical solution for the user.
+                                    </div>
+
+                                </div>
+
+                                <div
+                                    id="step-4-status"
+                                    class="step-status"
+                                >
+                                    Waiting
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        id="log"
+                        class="log"
+                    ></div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =================================================
+                 RESULT PANEL
+                 ================================================= -->
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div class="panel-title">
+                        <span>📤</span>
+                        Result
+                    </div>
+
+                    <button
+                        id="copy-result"
+                        class="button small"
+                        style="width:auto;"
+                    >
+                        Copy
+                    </button>
+
+                </div>
+
+                <div
+                    id="result"
+                    class="panel-body"
+                >
+
+                    <div class="empty-state">
+
+                        <div>
+
+                            <div class="empty-state-icon">
+                                🧠
+                            </div>
+
+                            <div class="empty-state-title">
+                                No result yet
+                            </div>
+
+                            <div class="empty-state-description">
+                                Configure your Vision and Math server addresses,
+                                add a problem or image, and click
+                                <strong>Solve problem</strong>.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+
+        <footer class="bottom-bar">
+
+            <div class="bottom-info">
+
+                <strong id="bottom-status">
+                    Ready
+                </strong>
+
+                <span id="bottom-detail">
+                    Configure the local AI servers to begin.
+                </span>
+
+            </div>
+
+            <button
+                id="solve-button"
+                class="button primary solve-button"
+            >
+                Solve problem
+            </button>
+
+        </footer>
+
+    </main>
+
 </div>
 
-<button id="change-model">🔄 Change model</button>
-<div id="chat"></div>
 
-<div id="input-area">
-  <label class="translation-toggle">
-    <input type="checkbox" id="translate-checkbox" checked>
-    Enable Translation (PT ↔ EN)
-  </label>
-  
-  <div id="file-preview-container"></div>
-  
-  <div class="input-row">
-    <button id="attach-btn" title="Upload PDF, text, code, or image files">📎</button>
-    <input
-      type="file"
-      id="file-input"
-      multiple
-      hidden
-      accept=".pdf,.txt,.md,.csv,.json,.xml,.html,.js,.ts,.tsx,.jsx,.java,.cpp,.h,.hpp,.py,.sql,.jpg,.jpeg,.png,.webp,.gif"
-    >
-    
-    <textarea id="input" rows="2" placeholder="Digite sua mensagem..."></textarea>
-    <button id="send">Send</button>
-  </div>
-</div>
+<div
+    id="toast-container"
+    class="toast-container"
+></div>
+
 
 <script>
-const LM_STUDIO_URL = "http://192.168.0.177:1234";
-const LM_API_TOKEN = "";
+"use strict";
 
-// The browser uploads the ORIGINAL file bytes to this service.
-// Expected response:
-// { files: [{ name, type, size, text?, data_url? }] }
-const FILE_UPLOAD_URL = "http://192.168.0.177:8080/api/files";
+/* ================================================================
+   CONFIGURATION
+   ================================================================ */
 
-let selectedModel = null;
-const TRANSLATOR_MODEL_ID = "google/gemma-3-1b";
-let translatorModelKey = TRANSLATOR_MODEL_ID;
-let previousResponseId = null;
-let models = [];
-let activeAbortController = null;
-let isGenerating = false;
-let pendingFiles = [];
+const DEFAULT_CONFIG = {
+    visionServerUrl: "http://localhost:8002",
+    mathServerUrl: "http://localhost:8001",
 
-const modelLabel = document.getElementById("model");
-const statusLabel = document.getElementById("status");
-const modelsContainer = document.getElementById("models");
-const modelMenu = document.getElementById("model-menu");
-const chat = document.getElementById("chat");
-const inputArea = document.getElementById("input-area");
-const changeModel = document.getElementById("change-model");
-const input = document.getElementById("input");
-const send = document.getElementById("send");
+    visionModel: "",
+    mathModel: "",
 
-// File Attachment Logic
-const fileInput = document.getElementById("file-input");
-const attachBtn = document.getElementById("attach-btn");
-const filePreview = document.getElementById("file-preview-container");
+    temperature: 0.2,
+    maxTokens: 4096,
 
-attachBtn.addEventListener("click", () => fileInput.click());
-
-fileInput.addEventListener("change", (e) => {
-  for (const file of e.target.files) {
-    pendingFiles.push(file);
-  }
-  renderFilePreview();
-  fileInput.value = ""; 
-});
-
-function renderFilePreview() {
-  filePreview.innerHTML = "";
-  if (pendingFiles.length === 0) {
-    filePreview.style.display = "none";
-    return;
-  }
-  filePreview.style.display = "flex";
-  pendingFiles.forEach((file, idx) => {
-    const badge = document.createElement("div");
-    badge.className = "file-badge";
-    badge.innerHTML = `
-      <span>📄 ${file.name}</span>
-      <span class="file-remove" onclick="removeFile(${idx})" title="Remove file">✕</span>
-    `;
-    filePreview.appendChild(badge);
-  });
-}
-
-window.removeFile = function(idx) {
-  pendingFiles.splice(idx, 1);
-  renderFilePreview();
+    showThinking: true
 };
 
-async function uploadFilesToServer() {
-  if (pendingFiles.length === 0) return { text: "", images: [] };
 
-  const formData = new FormData();
+/* ================================================================
+   APPLICATION STATE
+   ================================================================ */
 
-  for (const file of pendingFiles) {
-    formData.append("files", file, file.name);
-  }
+const state = {
 
-  const response = await fetch(FILE_UPLOAD_URL, {
-    method: "POST",
-    body: formData,
-    signal: activeAbortController ? activeAbortController.signal : undefined
-  });
+    visionModels: [],
+    mathModels: [],
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`File upload failed (HTTP ${response.status}): ${body}`);
-  }
+    visionOnline: false,
+    mathOnline: false,
 
-  const data = await response.json();
+    attachments: [],
 
-  if (!Array.isArray(data.files)) {
-    throw new Error(
-      "Upload server returned an invalid response. Expected { files: [...] }."
+    running: false,
+
+    abortController: null,
+
+    lastResult: "",
+
+    config: loadConfig()
+};
+
+
+/* ================================================================
+   DOM
+   ================================================================ */
+
+const $ = id => document.getElementById(id);
+
+const elements = {
+
+    visionServer: $("vision-server"),
+    mathServer: $("math-server"),
+
+    visionModel: $("vision-model"),
+    mathModel: $("math-model"),
+
+    visionStatus: $("vision-status"),
+    mathStatus: $("math-status"),
+
+    testVision: $("test-vision"),
+    testMath: $("test-math"),
+    testAll: $("test-all"),
+
+    saveSettings: $("save-settings"),
+    clearSettings: $("clear-settings"),
+
+    temperature: $("temperature"),
+    maxTokens: $("max-tokens"),
+    showThinking: $("show-thinking"),
+
+    dropzone: $("dropzone"),
+    fileInput: $("file-input"),
+    attachmentList: $("attachment-list"),
+
+    problemInput: $("problem-input"),
+    characterCount: $("character-count"),
+
+    solveButton: $("solve-button"),
+    clearInput: $("clear-input"),
+
+    result: $("result"),
+    copyResult: $("copy-result"),
+
+    log: $("log"),
+
+    bottomStatus: $("bottom-status"),
+    bottomDetail: $("bottom-detail"),
+
+    summaryVisionDot: $("summary-vision-dot"),
+    summaryMathDot: $("summary-math-dot"),
+
+    toastContainer: $("toast-container")
+};
+
+
+/* ================================================================
+   STORAGE
+   ================================================================ */
+
+function loadConfig() {
+
+    try {
+
+        const saved =
+            JSON.parse(
+                localStorage.getItem("local_ai_ide_config") || "{}"
+            );
+
+        return {
+            ...DEFAULT_CONFIG,
+            ...saved
+        };
+
+    } catch (error) {
+
+        console.warn(
+            "Could not load saved configuration:",
+            error
+        );
+
+        return {
+            ...DEFAULT_CONFIG
+        };
+    }
+}
+
+
+function saveConfig() {
+
+    state.config = {
+
+        visionServerUrl:
+            normalizeUrl(elements.visionServer.value),
+
+        mathServerUrl:
+            normalizeUrl(elements.mathServer.value),
+
+        visionModel:
+            elements.visionModel.value,
+
+        mathModel:
+            elements.mathModel.value,
+
+        temperature:
+            Number(elements.temperature.value),
+
+        maxTokens:
+            Number(elements.maxTokens.value),
+
+        showThinking:
+            elements.showThinking.checked
+    };
+
+    localStorage.setItem(
+        "local_ai_ide_config",
+        JSON.stringify(state.config)
     );
-  }
 
-  let text = "";
-  const images = [];
+    toast(
+        "Settings saved.",
+        "success"
+    );
+}
 
-  for (const file of data.files) {
-    if (file.text) {
-      text += `\n--- Start of attached file: ${file.name} ---\n`;
-      text += file.text;
-      text += `\n--- End of attached file: ${file.name} ---\n`;
+
+function clearConfig() {
+
+    localStorage.removeItem(
+        "local_ai_ide_config"
+    );
+
+    state.config = {
+        ...DEFAULT_CONFIG
+    };
+
+    applyConfigToUI();
+
+    toast(
+        "Saved settings cleared.",
+        "success"
+    );
+}
+
+
+/* ================================================================
+   CONFIG UI
+   ================================================================ */
+
+function applyConfigToUI() {
+
+    elements.visionServer.value =
+        state.config.visionServerUrl;
+
+    elements.mathServer.value =
+        state.config.mathServerUrl;
+
+    elements.temperature.value =
+        state.config.temperature;
+
+    elements.maxTokens.value =
+        state.config.maxTokens;
+
+    elements.showThinking.checked =
+        state.config.showThinking;
+
+    setSelectValue(
+        elements.visionModel,
+        state.config.visionModel
+    );
+
+    setSelectValue(
+        elements.mathModel,
+        state.config.mathModel
+    );
+}
+
+
+function setSelectValue(select, value) {
+
+    if (!value) {
+        return;
+    }
+
+    const exists =
+        Array.from(select.options)
+            .some(option => option.value === value);
+
+    if (exists) {
+        select.value = value;
+    }
+}
+
+
+/* ================================================================
+   URL HANDLING
+   ================================================================ */
+
+function normalizeUrl(url) {
+
+    if (!url) {
+        return "";
+    }
+
+    url = url.trim();
+
+    if (!url) {
+        return "";
     }
 
     if (
-      file.data_url &&
-      String(file.type || "").startsWith("image/")
+        !url.startsWith("http://") &&
+        !url.startsWith("https://")
     ) {
-      images.push({
-        name: file.name,
-        data_url: file.data_url
-      });
-    }
-  }
-
-  return { text, images };
-}
-
-// Utility functions
-function isTranslatorModel(key) {
-  if (!key) return false;
-  const k = String(key).trim().toLowerCase();
-  return k === TRANSLATOR_MODEL_ID.toLowerCase() ||
-         (k.includes("gemma") && k.includes("3-1b"));
-}
-
-function getModelKey(model) {
-  return model?.key || model?.id || model?.model || "";
-}
-
-function getModelName(model) {
-  return model?.display_name || model?.name || getModelKey(model);
-}
-
-function getHeaders() {
-  const headers = { "Content-Type": "application/json" };
-  if (LM_API_TOKEN) headers["Authorization"] = `Bearer ${LM_API_TOKEN}`;
-  return headers;
-}
-
-function setStatus(text) {
-  statusLabel.textContent = text;
-}
-
-function scrollToBottom(force = false) {
-  const threshold = 40;
-  const isAtBottom = (chat.scrollHeight - chat.clientHeight - chat.scrollTop) <= threshold;
-  if (force || isAtBottom) {
-    chat.scrollTop = chat.scrollHeight;
-  }
-}
-
-async function loadModels() {
-  try {
-    setStatus("Connecting to LM Studio...");
-    
-    let response = await fetch(`${LM_STUDIO_URL}/api/v1/models`, { headers: getHeaders() }).catch((err) => { console.warn("Falha em /api/v1/models:", err); return null; });
-    
-    if (!response || !response.ok) {
-      response = await fetch(`${LM_STUDIO_URL}/v1/models`, { headers: getHeaders() });
+        url = "http://" + url;
     }
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ` + await response.text());
-
-    const data = await response.json();
-    const rawList = data.models || data.data || [];
-    const allLlmModels = rawList
-      .map(model => ({ ...model, key: getModelKey(model), display_name: getModelName(model) }))
-      .filter(model => model.key && (!model.type || model.type === "llm"));
-
-    const translatorObj = allLlmModels.find(m => isTranslatorModel(m.key || m.id));
-    if (translatorObj) {
-      translatorModelKey = translatorObj.key || translatorObj.id;
-      ensureTranslatorLoaded(translatorObj).catch(err => console.warn("Erro ao pre-carregar tradutor:", err));
-    }
-
-    models = allLlmModels.filter(m => !isTranslatorModel(m.key || m.id));
-
-    if (!translatorObj) {
-      console.warn(`Modelo tradutor ${TRANSLATOR_MODEL_ID} não encontrado na lista do LM Studio.`);
-    }
-
-    if (models.length === 0) {
-      modelsContainer.innerHTML = "<p>❌ Nenhum modelo principal encontrado.</p>";
-      setStatus("Nenhum modelo disponível");
-      return;
-    }
-
-    renderModels();
-    setStatus(`${models.length} modelo(s) disponível(is)`);
-  } catch (error) {
-    console.error("Erro ao carregar modelos:", error);
-    modelsContainer.innerHTML = `
-      <p>❌ Não foi possível conectar ao LM Studio.</p>
-      <p style="color:red; font-size:13px;">${error.message}</p>
-      <button onclick="loadModels()" style="margin-top:10px; padding:6px 12px; cursor:pointer;">Tentar novamente</button>
-    `;
-    setStatus("Erro de conexão");
-  }
+    return url.replace(/\/+$/, "");
 }
 
-let translatorLoadPromise = null;
 
-async function ensureTranslatorLoaded(translatorObj) {
-  const modelKey = getModelKey(translatorObj);
-  if (!modelKey) throw new Error("Gemma 3 1B não possui um ID de modelo válido.");
-  translatorModelKey = modelKey;
+/* ================================================================
+   SERVER API
+   ================================================================ */
 
-  if (translatorObj.loaded_instances?.length > 0) return true;
-  if (translatorLoadPromise) return translatorLoadPromise;
+async function fetchModels(serverUrl) {
 
-  translatorLoadPromise = (async () => {
-    const response = await fetch(`${LM_STUDIO_URL}/api/v1/models/load`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify({
-        model: modelKey,
-        context_length: 4096,
-        echo_load_config: true
-      })
-    });
+    const server =
+        normalizeUrl(serverUrl);
+
+    if (!server) {
+        throw new Error(
+            "Server address is empty."
+        );
+    }
+
+    const response =
+        await fetch(
+            `${server}/v1/models`,
+            {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                }
+            }
+        );
+
     if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`Falha ao carregar Gemma 3 1B (HTTP ${response.status}): ${body}`);
-    }
-    return true;
-  })().catch(err => {
-    translatorLoadPromise = null;
-    console.warn("Gemma 3 1B não pôde ser pré-carregado. A tradução tentará usar o modelo mesmo assim:", err);
-    return false;
-  });
 
-  return translatorLoadPromise;
-}
-
-function renderModels() {
-  modelsContainer.innerHTML = "";
-  models.forEach((model, index) => {
-    const button = document.createElement("button");
-    button.className = "model-button";
-    const loaded = model.loaded_instances && model.loaded_instances.length > 0;
-    if (loaded) button.classList.add("loaded");
-
-    button.textContent = `${index + 1}. ${getModelName(model)}${loaded ? "  ✓ LOADED" : ""}`;
-    button.onclick = () => selectModel(model);
-    modelsContainer.appendChild(button);
-  });
-}
-
-async function selectModel(model) {
-  document.querySelectorAll(".model-button").forEach(b => b.disabled = true);
-  selectedModel = getModelKey(model);
-  modelLabel.textContent = `Model: ${getModelName(model)}`;
-
-  try {
-    const loaded = model.loaded_instances && model.loaded_instances.length > 0;
-    if (loaded) {
-      setStatus("✓ Model already loaded");
-    } else {
-      await unloadOtherModels(selectedModel);
-      setStatus("⏳ Loading model into memory...");
-
-      const loadResponse = await fetch(`${LM_STUDIO_URL}/api/v1/models/load`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({
-          model: model.key,
-          context_length: 8000,
-          echo_load_config: true
-        })
-      });
-
-      if (!loadResponse.ok) throw new Error(`HTTP ${loadResponse.status}: ` + await loadResponse.text());
-      const loadData = await loadResponse.json();
-      if (loadData.status !== "loaded") throw new Error("LM Studio did not report model as loaded.");
-
-      setStatus(`✓ Loaded in ${loadData.load_time_seconds?.toFixed(1) || "?"}s`);
+        throw new Error(
+            `HTTP ${response.status} ${response.statusText}`
+        );
     }
 
-    previousResponseId = null;
-    modelMenu.style.display = "none";
-    chat.style.display = "block";
-    inputArea.style.display = "flex";
-    changeModel.style.display = "block";
+    const data =
+        await response.json();
 
-    addMessage(`✓ Model ready:\n${selectedModel}`, "system");
-    input.focus();
-  } catch (error) {
-    setStatus("❌ Failed to load model");
-    addMessage(`❌ Error loading model:\n\n${error.message}`, "system");
-    document.querySelectorAll(".model-button").forEach(b => b.disabled = false);
-  }
-}
-
-async function unloadOtherModels(selectedKey) {
-  const response = await fetch(`${LM_STUDIO_URL}/api/v1/models`, { headers: getHeaders() });
-  if (!response.ok) return;
-
-  const data = await response.json();
-  const allModels = (data.models || data.data || []).map(model => ({
-    ...model,
-    key: getModelKey(model),
-    display_name: getModelName(model)
-  }));
-
-  for (const model of allModels) {
-    if (model.key === selectedKey || isTranslatorModel(model.key)) continue;
-
-    const instances = model.loaded_instances || [];
-    for (const instance of instances) {
-      setStatus(`⏳ Unloading ${model.display_name || model.key}...`);
-      await fetch(`${LM_STUDIO_URL}/api/v1/models/unload`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({ instance_id: instance.id })
-      });
-    }
-  }
-}
-
-function addMessage(text, type) {
-  const div = document.createElement("div");
-  div.className = `message ${type}`;
-  div.textContent = text;
-  chat.appendChild(div);
-  scrollToBottom(true);
-  return div;
-}
-
-function createAiMessagePlaceholder() {
-  const messageDiv = document.createElement("div");
-  messageDiv.className = "message ai";
-
-  const progressBox = document.createElement("div");
-  progressBox.className = "progress-box";
-  progressBox.innerHTML = `
-    <div class="progress-header">
-      <span class="progress-label">Processing prompt...</span>
-      <span class="progress-val">0%</span>
-    </div>
-    <div class="progress-track"><div class="progress-fill"></div></div>
-  `;
-
-  const toolBox = document.createElement("div");
-  toolBox.className = "tool-box";
-  toolBox.innerHTML = `
-    <div class="tool-header">
-      <span class="tool-title">⚡ Status: <span class="tool-name"></span></span>
-      <span class="tool-status">running...</span>
-    </div>
-  `;
-
-  const thinkingContainer = document.createElement("div");
-  thinkingContainer.className = "thinking-container";
-
-  const internalWrapper = document.createElement("div");
-  internalWrapper.className = "internal-wrapper";
-  internalWrapper.innerHTML = `
-    <div class="internal-header">
-      <div class="internal-title">🔍 Internal Processing (EN)</div>
-      <span class="internal-toggle">▼</span>
-    </div>
-    <div class="internal-content collapsed">
-      <span class="internal-label">Translated Prompt (PT ➔ EN)</span>
-      <div class="internal-prompt-text"></div>
-      <div class="internal-divider"></div>
-      <span class="internal-label">Raw Model Response (EN)</span>
-      <div class="internal-response-text"></div>
-    </div>
-  `;
-  const internalHeader = internalWrapper.querySelector(".internal-header");
-  const internalContent = internalWrapper.querySelector(".internal-content");
-  const internalToggle = internalWrapper.querySelector(".internal-toggle");
-  const internalPromptText = internalWrapper.querySelector(".internal-prompt-text");
-  const internalResponseText = internalWrapper.querySelector(".internal-response-text");
-
-  internalHeader.onclick = () => {
-    const isCollapsed = internalContent.classList.toggle("collapsed");
-    internalToggle.textContent = isCollapsed ? "▶" : "▲";
-    if (!isCollapsed) internalContent.scrollTop = internalContent.scrollHeight;
-  };
-
-  const responseContent = document.createElement("div");
-  responseContent.className = "response-content";
-
-  const cursor = document.createElement("span");
-  cursor.className = "cursor";
-
-  messageDiv.appendChild(progressBox);
-  messageDiv.appendChild(toolBox);
-  messageDiv.appendChild(thinkingContainer);
-  messageDiv.appendChild(internalWrapper); 
-  messageDiv.appendChild(responseContent);
-  messageDiv.appendChild(cursor);
-  chat.appendChild(messageDiv);
-  scrollToBottom(true);
-
-  let isThinking = false;
-  let currentThinking = null;
-
-  function createThinkingBlock(modelLabel) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "thinking-wrapper";
-
-    const header = document.createElement("div");
-    header.className = "thinking-header";
-
-    const title = document.createElement("div");
-    title.className = "thinking-title";
-    title.innerHTML = `<span class="pulse-dot"></span> <span class="think-label">Thinking... — ${modelLabel} (0.0s)</span>`;
-
-    const toggleIcon = document.createElement("span");
-    toggleIcon.textContent = "▶";
-
-    header.appendChild(title);
-    header.appendChild(toggleIcon);
-
-    const content = document.createElement("div");
-    content.className = "thinking-content collapsed";
-
-    header.onclick = () => {
-      const isCollapsed = content.classList.toggle("collapsed");
-      toggleIcon.textContent = isCollapsed ? "▶" : "▼";
-      if (!isCollapsed) content.scrollTop = content.scrollHeight;
-    };
-
-    wrapper.appendChild(header);
-    wrapper.appendChild(content);
-    thinkingContainer.appendChild(wrapper);
-
-    return { wrapper, title, content, toggleIcon, modelLabel, startTime: Date.now(), timer: null };
-  }
-
-  function finishThinkingBlock(block) {
-    if (!block) return;
-    const elapsed = ((Date.now() - block.startTime) / 1000).toFixed(1);
-    const label = block.title.querySelector(".think-label");
-    if (label) label.textContent = `Thought process — ${block.modelLabel} (${elapsed}s)`;
-    const dot = block.title.querySelector(".pulse-dot");
-    if (dot) dot.remove();
-    if (block.timer) clearInterval(block.timer);
-  }
-
-  return {
-    showPromptProgress(pct) {
-      progressBox.style.display = "block";
-      progressBox.querySelector(".progress-val").textContent = `${pct}%`;
-      progressBox.querySelector(".progress-fill").style.width = `${pct}%`;
-      scrollToBottom();
-    },
-
-    hidePromptProgress() {
-      if (progressBox.style.display !== "none") {
-        progressBox.style.display = "none";
-      }
-    },
-
-    showToolCall(toolName, status = "running...") {
-      toolBox.style.display = "block";
-      toolBox.querySelector(".tool-name").textContent = toolName;
-      toolBox.querySelector(".tool-status").textContent = status;
-      scrollToBottom();
-    },
-
-    completeToolCall(toolName) {
-      toolBox.style.display = "block";
-      toolBox.querySelector(".tool-name").textContent = toolName;
-      toolBox.querySelector(".tool-status").textContent = "✓ completed";
-      scrollToBottom();
-    },
-
-    startThinking(modelLabel = "Model") {
-      if (isThinking && currentThinking && currentThinking.modelLabel === modelLabel) return;
-
-      if (currentThinking && isThinking) {
-        finishThinkingBlock(currentThinking);
-      }
-
-      currentThinking = createThinkingBlock(modelLabel);
-      isThinking = true;
-
-      currentThinking.timer = setInterval(() => {
-        if (!isThinking || !currentThinking) return;
-        const elapsed = ((Date.now() - currentThinking.startTime) / 1000).toFixed(1);
-        const label = currentThinking.title.querySelector(".think-label");
-        if (label) label.textContent = `Thinking... — ${currentThinking.modelLabel} (${elapsed}s)`;
-      }, 100);
-      scrollToBottom();
-    },
-
-    appendThinking(text) {
-      if (!text) return;
-      if (!currentThinking || !isThinking) this.startThinking("Model");
-
-      const content = currentThinking.content;
-      const threshold = 30;
-      const isAtThinkingBottom = (content.scrollHeight - content.clientHeight - content.scrollTop) <= threshold;
-
-      content.textContent += text;
-      currentThinking.wrapper.style.display = "block";
-
-      if (isAtThinkingBottom) content.scrollTop = content.scrollHeight;
-      scrollToBottom();
-    },
-
-    endThinking() {
-      if (!currentThinking) return;
-      finishThinkingBlock(currentThinking);
-      isThinking = false;
-      scrollToBottom();
-    },
-
-    setInternalPrompt(text) {
-      internalWrapper.style.display = "block";
-      internalPromptText.textContent = text;
-      scrollToBottom();
-    },
-
-    appendInternalResponse(text) {
-      internalResponseText.textContent += text;
-      const threshold = 30;
-      const isAtBottom = (internalContent.scrollHeight - internalContent.clientHeight - internalContent.scrollTop) <= threshold;
-      if (isAtBottom && !internalContent.classList.contains("collapsed")) {
-        internalContent.scrollTop = internalContent.scrollHeight;
-      }
-      scrollToBottom();
-    },
-
-    appendContent(text) {
-      responseContent.textContent += text;
-      scrollToBottom();
-    },
-
-    setContent(text) {
-      responseContent.textContent = text;
-      scrollToBottom();
-    },
-
-    markCancelled() {
-      const badge = document.createElement("div");
-      badge.className = "status-badge-cancelled";
-      badge.textContent = "⏹ Generation stopped";
-      messageDiv.appendChild(badge);
-      scrollToBottom();
-    },
-
-    finalize() {
-      this.hidePromptProgress();
-      this.endThinking();
-      cursor.remove();
-    }
-  };
-}
-
-function cancelGeneration() {
-  if (activeAbortController) {
-    activeAbortController.abort();
-    activeAbortController = null;
-  }
-}
-
-async function translateText(text, direction, aiUi) {
-  if (!text || !text.trim()) return text;
-
-  await ensureTranslatorLoaded({ key: translatorModelKey });
-
-  const prompt = direction === "PT_TO_EN"
-    ? `Translate to English:\n${text}`
-    : `Traduza para Português BR:\n${text}`;
-
-  const response = await fetch(`${LM_STUDIO_URL}/api/v1/chat`, {
-    method: "POST",
-    headers: getHeaders(),
-    body: JSON.stringify({
-      model: translatorModelKey,
-      input: prompt,
-      temperature: 0.1,
-      stream: true
-    }),
-    signal: activeAbortController ? activeAbortController.signal : null
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Erro na tradução com Gemma 3 1B (HTTP ${response.status}): ${body}`);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let sseBuffer = "";
-  let currentEventType = null;
-  let resultBuffer = "";
-  let rawBuffer = "";
-  let isInlineThinking = false;
-  let activeCloseTag = "";
-
-  const tagPairs = [
-    { open: "<thought>", close: "</thought>" },
-    { open: "<think>", close: "</think>" },
-    { open: "<reasoning>", close: "</reasoning>" },
-    { open: "<reflection>", close: "</reflection>" }
-  ];
-
-  function extractReasoning(parsed, eventType) {
-    if (eventType && eventType.startsWith("reasoning")) {
-      return parsed.content ||
-             (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.content) ||
-             parsed.text || "";
+    if (
+        !data ||
+        !Array.isArray(data.data)
+    ) {
+        throw new Error(
+            "Invalid /v1/models response."
+        );
     }
 
-    return parsed.reasoning_content ||
-           parsed.delta?.reasoning_content ||
-           parsed.choices?.[0]?.delta?.reasoning_content ||
-           parsed.reasoning ||
-           parsed.delta?.reasoning ||
-           parsed.choices?.[0]?.delta?.reasoning ||
-           parsed.thought ||
-           parsed.delta?.thought || null;
-  }
+    return data.data;
+}
 
-  function handleContentChunk(chunk) {
-    if (!chunk) return;
-    rawBuffer += chunk;
 
-    while (rawBuffer.length > 0) {
-      if (!isInlineThinking) {
-        let earliestIdx = -1;
-        let matchedPair = null;
+async function testServer(
+    type,
+    serverUrl
+) {
 
-        for (const pair of tagPairs) {
-          const idx = rawBuffer.indexOf(pair.open);
-          if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
-            earliestIdx = idx;
-            matchedPair = pair;
-          }
+    const statusElement =
+        type === "vision"
+            ? elements.visionStatus
+            : elements.mathStatus;
+
+    const dot =
+        statusElement.querySelector(
+            ".status-dot"
+        );
+
+    const text =
+        statusElement.querySelector(
+            "span:last-child"
+        );
+
+    dot.className =
+        "status-dot loading";
+
+    text.textContent =
+        "Connecting...";
+
+    updateSummaryDot(
+        type,
+        "loading"
+    );
+
+    try {
+
+        const models =
+            await fetchModels(serverUrl);
+
+        if (type === "vision") {
+
+            state.visionModels =
+                models;
+
+            state.visionOnline =
+                true;
+
+            populateModelSelect(
+                elements.visionModel,
+                models,
+                state.config.visionModel
+            );
+
+        } else {
+
+            state.mathModels =
+                models;
+
+            state.mathOnline =
+                true;
+
+            populateModelSelect(
+                elements.mathModel,
+                models,
+                state.config.mathModel
+            );
         }
 
-        if (earliestIdx !== -1) {
-          const before = rawBuffer.slice(0, earliestIdx);
-          if (before) resultBuffer += before;
-          aiUi.startThinking("Gemma 3 1B");
-          isInlineThinking = true;
-          activeCloseTag = matchedPair.close;
-          rawBuffer = rawBuffer.slice(earliestIdx + matchedPair.open.length);
-          continue;
+        dot.className =
+            "status-dot online";
+
+        text.textContent =
+            `Online · ${models.length} model${models.length === 1 ? "" : "s"}`;
+
+        updateSummaryDot(
+            type,
+            "online"
+        );
+
+        log(
+            `${capitalize(type)} server connected: ${serverUrl}`,
+            "success"
+        );
+
+        return true;
+
+    } catch (error) {
+
+        if (type === "vision") {
+            state.visionModels = [];
+            state.visionOnline = false;
+        } else {
+            state.mathModels = [];
+            state.mathOnline = false;
         }
 
-        let isPartial = false;
-        for (const pair of tagPairs) {
-          if (pair.open.startsWith(rawBuffer)) {
-            isPartial = true;
-            break;
-          }
-        }
-        if (isPartial) break;
+        dot.className =
+            "status-dot offline";
 
-        resultBuffer += rawBuffer;
-        rawBuffer = "";
-      } else {
-        const endIdx = rawBuffer.indexOf(activeCloseTag);
-        if (endIdx !== -1) {
-          aiUi.appendThinking(rawBuffer.slice(0, endIdx));
-          aiUi.endThinking();
-          isInlineThinking = false;
-          rawBuffer = rawBuffer.slice(endIdx + activeCloseTag.length).trimStart();
-          continue;
-        }
+        text.textContent =
+            `Offline · ${error.message}`;
 
-        if (activeCloseTag.startsWith(rawBuffer)) break;
+        updateSummaryDot(
+            type,
+            "offline"
+        );
 
-        aiUi.appendThinking(rawBuffer);
-        rawBuffer = "";
-      }
+        log(
+            `${capitalize(type)} server unavailable: ${error.message}`,
+            "error"
+        );
+
+        return false;
     }
-  }
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-
-    sseBuffer += decoder.decode(value, { stream: true });
-    const lines = sseBuffer.split("\n");
-    sseBuffer = lines.pop();
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      if (trimmed.startsWith("event:")) {
-        currentEventType = trimmed.slice(6).trim();
-        continue;
-      }
-
-      if (!trimmed.startsWith("data:")) continue;
-      const jsonStr = trimmed.slice(5).trim();
-      if (jsonStr === "[DONE]") continue;
-
-      try {
-        const parsed = JSON.parse(jsonStr);
-        const eventType = parsed.type || currentEventType;
-
-        const reasoningChunk = extractReasoning(parsed, eventType);
-        if (reasoningChunk) {
-          aiUi.startThinking("Gemma 3 1B"); 
-          aiUi.appendThinking(reasoningChunk);
-          continue;
-        }
-
-        if (eventType === "reasoning.end") {
-          aiUi.endThinking();
-          continue;
-        }
-
-        const content = parsed.content ||
-                        (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.content) ||
-                        parsed.choices?.[0]?.delta?.content || null;
-
-        if (content) handleContentChunk(content);
-      } catch (e) {}
-    }
-  }
-
-  if (rawBuffer) {
-    if (isInlineThinking) {
-      aiUi.appendThinking(rawBuffer);
-    } else {
-      resultBuffer += rawBuffer;
-    }
-  }
-  if (isInlineThinking) aiUi.endThinking();
-
-  const result = String(resultBuffer)
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
-    .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
-    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
-    .replace(/<reflection>[\s\S]*?<\/reflection>/gi, "")
-    .trim();
-
-  if (!result) throw new Error("Gemma 3 1B retornou uma tradução vazia.");
-  return result;
 }
 
-async function sendMessage() {
-  const text = input.value.trim();
-  if (!selectedModel || (pendingFiles.length === 0 && !text)) return;
 
-  const useTranslation = document.getElementById("translate-checkbox").checked;
+function populateModelSelect(
+    select,
+    models,
+    preferredModel
+) {
 
-  input.value = "";
-  isGenerating = true;
+    select.innerHTML = "";
 
-  send.textContent = "⏹ Cancel";
-  send.classList.add("cancel-state");
-  send.disabled = false;
+    if (!models.length) {
 
-  const fileNames = pendingFiles.length > 0 ? pendingFiles.map(f => f.name).join(", ") : "";
-  const displayMsg = text + (fileNames ? `\n\n📎 Attached files: ${fileNames}` : "");
-  addMessage(displayMsg, "user");
-  
-  const aiUi = createAiMessagePlaceholder();
+        const option =
+            document.createElement("option");
 
-  let rawBuffer = "";
-  let isInlineThinking = false;
-  let activeOpenTag = "";
-  let activeCloseTag = "";
+        option.value = "";
 
-  const tagPairs = [
-    { open: "<thought>", close: "</thought>" },
-    { open: "<think>", close: "</think>" },
-    { open: "<reasoning>", close: "</reasoning>" },
-    { open: "<reflection>", close: "</reflection>" }
-  ];
+        option.textContent =
+            "No models available";
 
-  activeAbortController = new AbortController();
+        select.appendChild(option);
 
-  try {
-    let promptToUse = text;
-
-    if (useTranslation && text.length > 0) {
-      setStatus("⏳ Traduzindo pergunta para Inglês (Gemma 3 1B)...");
-      aiUi.showToolCall("Tradução (PT-BR ➔ EN)", "Gemma 3 1B em execução...");
-      
-      promptToUse = await translateText(text, "PT_TO_EN", aiUi);
-      if (!promptToUse || !promptToUse.trim()) {
-        promptToUse = text;
-      }
-      aiUi.completeToolCall("Tradução PT-BR ➔ EN");
-      
-      aiUi.setInternalPrompt(promptToUse);
+        return;
     }
 
-    // Upload ORIGINAL file bytes through the network.
-    // The server extracts PDF/TXT/etc. and can return image data URLs.
-    let uploadedFiles = { text: "", images: [] };
+    models.forEach(model => {
 
-    if (pendingFiles.length > 0) {
-      setStatus("⏳ Uploading attached files...");
-      aiUi.showToolCall(
-        "File upload",
-        "Sending files through network..."
-      );
+        const option =
+            document.createElement("option");
 
-      uploadedFiles = await uploadFilesToServer();
+        option.value =
+            model.id;
 
-      aiUi.completeToolCall("File upload");
+        option.textContent =
+            model.id;
 
-      if (uploadedFiles.text) {
-        promptToUse =
-          `${uploadedFiles.text}\n\nUser Request:\n${promptToUse}`;
-      }
-
-      pendingFiles = [];
-      renderFilePreview();
-    }
-
-    setStatus(`⏳ Processando no modelo ${selectedModel}...`);
-    aiUi.showToolCall(`Processando no modelo (${selectedModel})`, "Aguardando resposta...");
-    
-    let mainResponseBuffer = "";
-
-    const systemPromptContent = useTranslation
-      ? "Answer the user's request. The input has already been translated to English. Respond in English only; do not translate the user's request and do not act as a translation engine."
-      : "Answer the user's request.";
-
-    // LM Studio v1 accepts text plus image inputs in an input array.
-    const chatInput = uploadedFiles.images.length > 0
-      ? [
-          { type: "message", content: promptToUse },
-          ...uploadedFiles.images.map(image => ({
-            type: "image",
-            data_url: image.data_url
-          }))
-        ]
-      : promptToUse;
-
-    const requestBody = {
-      model: selectedModel,
-      input: chatInput,
-      system_prompt: systemPromptContent,
-      context_length: 8000,
-      temperature: 0.7,
-      store: true,
-      stream: true,
-      ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
-      integrations: [
-        {
-          type: "ephemeral_mcp",
-          server_label: "huggingface",
-          server_url: "https://huggingface.co/mcp",
-          allowed_tools: ["hub_repo_search"]
-        }
-      ]
-    };
-
-    const response = await fetch(`${LM_STUDIO_URL}/api/v1/chat`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(requestBody),
-      signal: activeAbortController.signal
+        select.appendChild(option);
     });
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ` + await response.text());
+    if (
+        preferredModel &&
+        models.some(
+            model => model.id === preferredModel
+        )
+    ) {
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let streamDone = false;
-    let sseBuffer = "";
-    let currentEventType = null;
+        select.value =
+            preferredModel;
 
-    function extractReasoning(parsed, eventType) {
-      if (eventType && eventType.startsWith("reasoning")) {
-        return parsed.content ||
-               (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.content) ||
-               parsed.text || "";
-      }
+    } else {
 
-      return parsed.reasoning_content ||
-             parsed.delta?.reasoning_content ||
-             parsed.choices?.[0]?.delta?.reasoning_content ||
-             parsed.reasoning ||
-             parsed.delta?.reasoning ||
-             parsed.choices?.[0]?.delta?.reasoning ||
-             parsed.thought ||
-             parsed.delta?.thought || null;
+        select.selectedIndex = 0;
+    }
+}
+
+
+/* ================================================================
+   SUMMARY STATUS
+   ================================================================ */
+
+function updateSummaryDot(
+    type,
+    status
+) {
+
+    const dot =
+        type === "vision"
+            ? elements.summaryVisionDot
+            : elements.summaryMathDot;
+
+    dot.className =
+        `status-dot ${status}`;
+}
+
+
+/* ================================================================
+   MODEL SELECTION
+   ================================================================ */
+
+function getSelectedVisionModel() {
+
+    return elements.visionModel.value.trim();
+}
+
+
+function getSelectedMathModel() {
+
+    return elements.mathModel.value.trim();
+}
+
+
+/* ================================================================
+   OPENAI-COMPATIBLE CHAT COMPLETION
+   ================================================================ */
+
+async function chatCompletion(
+    serverUrl,
+    model,
+    messages,
+    options = {}
+) {
+
+    const server =
+        normalizeUrl(serverUrl);
+
+    if (!server) {
+        throw new Error(
+            "Server address is empty."
+        );
     }
 
-    function handleContentChunk(chunk) {
-      if (!chunk) return;
-      rawBuffer += chunk;
-
-      while (rawBuffer.length > 0) {
-        if (!isInlineThinking) {
-          let earliestIdx = -1;
-          let matchedPair = null;
-
-          for (const pair of tagPairs) {
-            const idx = rawBuffer.indexOf(pair.open);
-            if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
-              earliestIdx = idx;
-              matchedPair = pair;
-            }
-          }
-
-          if (earliestIdx !== -1) {
-            const before = rawBuffer.slice(0, earliestIdx);
-            if (before) {
-              mainResponseBuffer += before;
-              if (useTranslation) aiUi.appendInternalResponse(before); 
-              else aiUi.appendContent(before);
-            }
-            aiUi.startThinking(selectedModel);
-            isInlineThinking = true;
-            activeOpenTag = matchedPair.open;
-            activeCloseTag = matchedPair.close;
-            rawBuffer = rawBuffer.slice(earliestIdx + activeOpenTag.length);
-            continue;
-          }
-
-          let isPartial = false;
-          for (const pair of tagPairs) {
-            if (pair.open.startsWith(rawBuffer)) {
-              isPartial = true;
-              break;
-            }
-          }
-          if (isPartial) break;
-
-          mainResponseBuffer += rawBuffer; 
-          if (useTranslation) aiUi.appendInternalResponse(rawBuffer); 
-          else aiUi.appendContent(rawBuffer);
-          
-          rawBuffer = "";
-        } else {
-          const endIdx = rawBuffer.indexOf(activeCloseTag);
-          if (endIdx !== -1) {
-            aiUi.appendThinking(rawBuffer.slice(0, endIdx));
-            aiUi.endThinking();
-            isInlineThinking = false;
-            rawBuffer = rawBuffer.slice(endIdx + activeCloseTag.length).trimStart();
-            continue;
-          }
-
-          if (activeCloseTag.startsWith(rawBuffer)) break;
-
-          aiUi.appendThinking(rawBuffer);
-          rawBuffer = "";
-        }
-      }
+    if (!model) {
+        throw new Error(
+            "No model selected."
+        );
     }
 
-    while (!streamDone) {
-      const { value, done } = await reader.read();
-      if (done) break;
+    const controller =
+        new AbortController();
 
-      sseBuffer += decoder.decode(value, { stream: true });
-      const lines = sseBuffer.split("\n");
-      sseBuffer = lines.pop();
+    state.abortController =
+        controller;
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
+    const body = {
 
-        if (trimmed.startsWith("event:")) {
-          currentEventType = trimmed.slice(6).trim();
-          continue;
-        }
+        model,
 
-        if (!trimmed.startsWith("data:")) continue;
-        const jsonStr = trimmed.slice(5).trim();
-        if (jsonStr === "[DONE]") {
-          streamDone = true;
-          break;
-        }
+        messages,
+
+        temperature:
+            options.temperature ??
+            Number(elements.temperature.value),
+
+        max_tokens:
+            options.max_tokens ??
+            Number(elements.maxTokens.value),
+
+        stream: false
+    };
+
+    const response =
+        await fetch(
+            `${server}/v1/chat/completions`,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+
+                    "Accept":
+                        "application/json"
+                },
+
+                body:
+                    JSON.stringify(body),
+
+                signal:
+                    controller.signal
+            }
+        );
+
+    if (!response.ok) {
+
+        let errorText = "";
 
         try {
-          const parsed = JSON.parse(jsonStr);
-          const eventType = parsed.type || currentEventType;
+            errorText =
+                await response.text();
+        } catch (_) {}
 
-          if (parsed.response_id) previousResponseId = parsed.response_id;
-          if (parsed.stats) {
-            setStatus(`✓ ${selectedModel} | ${parsed.stats.tokens_per_second?.toFixed(1) || "?"} tok/s`);
-          }
-
-          if (eventType === "prompt_processing.progress") {
-            const pct = Math.round((parsed.progress || 0) * 100);
-            aiUi.showPromptProgress(pct);
-            continue;
-          } else if (eventType === "prompt_processing.end") {
-            aiUi.hidePromptProgress();
-            continue;
-          }
-
-          if (eventType === "tool_call.start") {
-            aiUi.showToolCall(parsed.tool || "mcp_tool", "running...");
-            continue;
-          } else if (eventType === "tool_call.success") {
-            aiUi.completeToolCall(parsed.tool || "mcp_tool");
-            continue;
-          }
-
-          const reasoningChunk = extractReasoning(parsed, eventType);
-          if (reasoningChunk) {
-            aiUi.hidePromptProgress();
-            aiUi.startThinking(selectedModel);
-            aiUi.appendThinking(reasoningChunk);
-            continue;
-          }
-
-          if (eventType === "reasoning.end") {
-            aiUi.endThinking();
-            continue;
-          }
-
-          let content = parsed.content ||
-                        (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.content) ||
-                        parsed.choices?.[0]?.delta?.content || null;
-
-          if (content) {
-            aiUi.hidePromptProgress();
-            handleContentChunk(content);
-          }
-        } catch (e) {}
-      }
+        throw new Error(
+            `HTTP ${response.status}: ${errorText || response.statusText}`
+        );
     }
 
-    if (rawBuffer) {
-      if (isInlineThinking) {
-        aiUi.appendThinking(rawBuffer);
-      } else {
-        mainResponseBuffer += rawBuffer;
-        if (useTranslation) aiUi.appendInternalResponse(rawBuffer);
-        else aiUi.appendContent(rawBuffer);
-      }
+    const data =
+        await response.json();
+
+    if (
+        !data ||
+        !Array.isArray(data.choices) ||
+        !data.choices.length
+    ) {
+
+        throw new Error(
+            "Invalid chat completion response."
+        );
     }
 
-    aiUi.completeToolCall(`Resposta gerada (${selectedModel})`);
-
-    if (mainResponseBuffer && mainResponseBuffer.trim().length > 0) {
-      if (useTranslation) {
-        setStatus("⏳ Traduzindo resposta para Português (Gemma 3 1B)...");
-        aiUi.showToolCall("Tradução (EN ➔ PT-BR)", "Gemma 3 1B em execução...");
-        
-        const ptResponse = await translateText(mainResponseBuffer, "EN_TO_PT", aiUi);
-        aiUi.completeToolCall("Tradução EN ➔ PT-BR");
-        
-        aiUi.setContent(ptResponse);
-      }
-      setStatus(`✓ Concluído`);
-    }
-
-  } catch (error) {
-    if (error.name === "AbortError") {
-      aiUi.markCancelled();
-      setStatus(`✓ Stopped generation`);
-    } else {
-      aiUi.appendContent("\n❌ Error:\n\n" + error.message);
-    }
-  } finally {
-    aiUi.finalize();
-    activeAbortController = null;
-    isGenerating = false;
-
-    send.textContent = "Send";
-    send.classList.remove("cancel-state");
-    send.disabled = false;
-    input.focus();
-  }
+    return data;
 }
 
-changeModel.addEventListener("click", async () => {
-  cancelGeneration();
-  previousResponseId = null;
-  selectedModel = null;
-  chat.innerHTML = "";
-  chat.style.display = "none";
-  inputArea.style.display = "none";
-  changeModel.style.display = "none";
-  modelMenu.style.display = "block";
-  setStatus("Refreshing models...");
-  await loadModels();
-});
 
-send.addEventListener("click", () => {
-  if (isGenerating) {
-    cancelGeneration();
-  } else {
-    sendMessage();
-  }
-});
+/* ================================================================
+   EXTRACT RESPONSE TEXT
+   ================================================================ */
 
-loadModels();
+function extractMessageContent(data) {
+
+    const message =
+        data.choices?.[0]?.message;
+
+    if (!message) {
+        return "";
+    }
+
+    if (
+        typeof message.content === "string"
+    ) {
+        return message.content;
+    }
+
+    if (
+        Array.isArray(message.content)
+    ) {
+
+        return message.content
+            .map(item => {
+
+                if (
+                    typeof item === "string"
+                ) {
+                    return item;
+                }
+
+                return item.text || "";
+            })
+            .join("");
+    }
+
+    return "";
+}
+
+
+/* ================================================================
+   THINKING EXTRACTION
+   ================================================================ */
+
+function extractThinking(
+    data,
+    content
+) {
+
+    const message =
+        data.choices?.[0]?.message;
+
+    if (!message) {
+        return "";
+    }
+
+    const possibleFields = [
+        "reasoning_content",
+        "thinking",
+        "reasoning"
+    ];
+
+    for (const field of possibleFields) {
+
+        if (
+            typeof message[field] === "string" &&
+            message[field].trim()
+        ) {
+
+            return message[field];
+        }
+    }
+
+    const match =
+        content.match(
+            /<think>([\s\S]*?)<\/think>/i
+        );
+
+    if (match) {
+        return match[1].trim();
+    }
+
+    return "";
+}
+
+
+/* ================================================================
+   IMAGE → DATA URL
+   ================================================================ */
+
+function fileToDataUrl(file) {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            const reader =
+                new FileReader();
+
+            reader.onload =
+                () => resolve(
+                    reader.result
+                );
+
+            reader.onerror =
+                () => reject(
+                    new Error(
+                        "Could not read image."
+                    )
+                );
+
+            reader.readAsDataURL(file);
+        }
+    );
+}
+
+
+/* ================================================================
+   VISION MESSAGE
+   ================================================================ */
+
+async function analyzeImage(
+    file,
+    instructions
+) {
+
+    const visionServer =
+        normalizeUrl(
+            elements.visionServer.value
+        );
+
+    const visionModel =
+        getSelectedVisionModel();
+
+    if (!visionServer) {
+
+        throw new Error(
+            "Vision server address is not configured."
+        );
+    }
+
+    if (!visionModel) {
+
+        throw new Error(
+            "No Vision model is selected."
+        );
+    }
+
+    const imageData =
+        await fileToDataUrl(file);
+
+    const messages = [
+
+        {
+            role: "system",
+
+            content:
+                `You are a precise mathematical vision assistant.
+
+Your job is to inspect the supplied image and extract the mathematics problem accurately.
+
+Do not solve the problem unless explicitly requested.
+
+Preserve:
+- mathematical notation
+- equations
+- numbers
+- units
+- diagrams
+- answer choices
+- constraints
+- variables
+
+If the image contains Portuguese text, preserve its meaning accurately.
+
+Return a clean textual representation of the problem.`
+        },
+
+        {
+            role: "user",
+
+            content: [
+
+                {
+                    type: "text",
+
+                    text:
+                        instructions ||
+                        "Extract and transcribe the mathematics problem from this image."
+                },
+
+                {
+                    type: "image_url",
+
+                    image_url: {
+                        url: imageData
+                    }
+                }
+
+            ]
+        }
+
+    ];
+
+    return chatCompletion(
+        visionServer,
+        visionModel,
+        messages
+    );
+}
+
+
+/* ================================================================
+   NORMALIZE PROBLEM
+   ================================================================ */
+
+async function normalizeProblem(
+    problem
+) {
+
+    const visionServer =
+        normalizeUrl(
+            elements.visionServer.value
+        );
+
+    const visionModel =
+        getSelectedVisionModel();
+
+    if (!visionServer) {
+
+        throw new Error(
+            "Vision server address is not configured."
+        );
+    }
+
+    if (!visionModel) {
+
+        throw new Error(
+            "No Vision model is selected."
+        );
+    }
+
+    const messages = [
+
+        {
+            role: "system",
+
+            content:
+                `You are a mathematical problem normalization assistant.
+
+Convert the supplied problem into a precise, self-contained mathematical statement.
+
+Requirements:
+1. Preserve all numerical information.
+2. Preserve all constraints.
+3. Correct obvious OCR errors.
+4. Make equations explicit.
+5. Do not solve the problem.
+6. Do not add assumptions.
+7. Return only the normalized problem.`
+        },
+
+        {
+            role: "user",
+
+            content:
+                problem
+        }
+
+    ];
+
+    return chatCompletion(
+        visionServer,
+        visionModel,
+        messages
+    );
+}
+
+
+/* ================================================================
+   SOLVE MATHEMATICS
+   ================================================================ */
+
+async function solveMath(
+    problem
+) {
+
+    const mathServer =
+        normalizeUrl(
+            elements.mathServer.value
+        );
+
+    const mathModel =
+        getSelectedMathModel();
+
+    if (!mathServer) {
+
+        throw new Error(
+            "Math server address is not configured."
+        );
+    }
+
+    if (!mathModel) {
+
+        throw new Error(
+            "No Math model is selected."
+        );
+    }
+
+    const messages = [
+
+        {
+            role: "system",
+
+            content:
+                `You are an expert mathematical reasoning model.
+
+Solve the problem rigorously.
+
+Requirements:
+- Analyze the problem carefully.
+- Show the mathematical derivation.
+- Explain important intermediate steps.
+- Verify the result.
+- Clearly state the final answer.
+- Do not invent missing information.
+
+Use Markdown and LaTeX when useful.`
+        },
+
+        {
+            role: "user",
+
+            content:
+                problem
+        }
+
+    ];
+
+    return chatCompletion(
+        mathServer,
+        mathModel,
+        messages
+    );
+}
+
+
+/* ================================================================
+   FINAL RESPONSE
+   ================================================================ */
+
+async function formatFinalAnswer(
+    originalProblem,
+    mathematicalSolution
+) {
+
+    const visionServer =
+        normalizeUrl(
+            elements.visionServer.value
+        );
+
+    const visionModel =
+        getSelectedVisionModel();
+
+    if (!visionServer || !visionModel) {
+
+        return mathematicalSolution;
+    }
+
+    const messages = [
+
+        {
+            role: "system",
+
+            content:
+                `You are a final-answer formatting assistant.
+
+Prepare a clear, concise mathematical answer for the user.
+
+Preserve all mathematical correctness.
+
+If the original problem is in Portuguese, answer in Brazilian Portuguese.
+
+If the original problem is in English, answer in English.
+
+Use Markdown and LaTeX where useful.
+
+Do not mention this internal pipeline.`
+        },
+
+        {
+            role: "user",
+
+            content:
+                `Original problem:
+
+${originalProblem}
+
+Mathematical solution:
+
+${mathematicalSolution}`
+        }
+
+    ];
+
+    try {
+
+        const data =
+            await chatCompletion(
+                visionServer,
+                visionModel,
+                messages
+            );
+
+        return extractMessageContent(data);
+
+    } catch (error) {
+
+        log(
+            `Final formatting skipped: ${error.message}`,
+            "warning"
+        );
+
+        return mathematicalSolution;
+    }
+}
+
+
+/* ================================================================
+   MAIN WORKFLOW
+   ================================================================ */
+
+async function executeWorkflow() {
+
+    if (state.running) {
+        return;
+    }
+
+    state.running = true;
+
+    elements.solveButton.disabled = true;
+
+    elements.solveButton.textContent =
+        "Solving...";
+
+    clearLog();
+
+    resetWorkflow();
+
+    try {
+
+        const textInput =
+            elements.problemInput.value.trim();
+
+        const imageFiles =
+            state.attachments.filter(
+                item =>
+                    item.file.type.startsWith(
+                        "image/"
+                    )
+            );
+
+        if (
+            !textInput &&
+            imageFiles.length === 0
+        ) {
+
+            throw new Error(
+                "Add an image or type a mathematics problem first."
+            );
+        }
+
+
+        /* --------------------------------------------------------
+           SERVER VALIDATION
+           -------------------------------------------------------- */
+
+        setBottomStatus(
+            "Checking servers...",
+            "Validating Vision and Math endpoints."
+        );
+
+        const visionOK =
+            await testServer(
+                "vision",
+                elements.visionServer.value
+            );
+
+        const mathOK =
+            await testServer(
+                "math",
+                elements.mathServer.value
+            );
+
+        if (!visionOK && !textInput) {
+
+            throw new Error(
+                "Vision server is unavailable and no text problem was supplied."
+            );
+        }
+
+        if (!mathOK) {
+
+            throw new Error(
+                "Math server is unavailable."
+            );
+        }
+
+
+        /* --------------------------------------------------------
+           STEP 1 — VISION
+           -------------------------------------------------------- */
+
+        let extractedProblem =
+            textInput;
+
+        if (imageFiles.length > 0) {
+
+            setStep(
+                1,
+                "running",
+                "Processing"
+            );
+
+            setBottomStatus(
+                "Analyzing image...",
+                "Vision model is extracting the mathematics problem."
+            );
+
+            log(
+                `Sending image to Vision server: ${elements.visionServer.value}`,
+                "info"
+            );
+
+            const data =
+                await analyzeImage(
+                    imageFiles[0].file,
+                    textInput
+                        ? `Extract the mathematics problem from the image.
+
+Additional user context:
+${textInput}`
+                        : "Extract the mathematics problem from this image."
+                );
+
+            extractedProblem =
+                extractMessageContent(data);
+
+            if (!extractedProblem.trim()) {
+
+                throw new Error(
+                    "Vision model returned an empty response."
+                );
+            }
+
+            setStep(
+                1,
+                "complete",
+                "Complete"
+            );
+
+            log(
+                "Vision extraction completed.",
+                "success"
+            );
+
+        } else {
+
+            setStep(
+                1,
+                "complete",
+                "Skipped"
+            );
+
+            log(
+                "No image supplied. Vision extraction skipped.",
+                "info"
+            );
+        }
+
+
+        /* --------------------------------------------------------
+           STEP 2 — NORMALIZATION
+           -------------------------------------------------------- */
+
+        setStep(
+            2,
+            "running",
+            "Processing"
+        );
+
+        setBottomStatus(
+            "Normalizing problem...",
+            "Preparing a clean mathematical representation."
+        );
+
+        let normalizedProblem =
+            extractedProblem;
+
+        if (state.visionOnline) {
+
+            try {
+
+                const normalizationData =
+                    await normalizeProblem(
+                        extractedProblem
+                    );
+
+                const normalized =
+                    extractMessageContent(
+                        normalizationData
+                    );
+
+                if (normalized.trim()) {
+
+                    normalizedProblem =
+                        normalized;
+                }
+
+                log(
+                    "Problem normalization completed.",
+                    "success"
+                );
+
+            } catch (error) {
+
+                log(
+                    `Normalization fallback: ${error.message}`,
+                    "warning"
+                );
+            }
+        }
+
+        setStep(
+            2,
+            "complete",
+            "Complete"
+        );
+
+
+        /* --------------------------------------------------------
+           STEP 3 — MATH
+           -------------------------------------------------------- */
+
+        setStep(
+            3,
+            "running",
+            "Processing"
+        );
+
+        setBottomStatus(
+            "Solving mathematics...",
+            "Math model is reasoning about the normalized problem."
+        );
+
+        log(
+            `Sending problem to Math server: ${elements.mathServer.value}`,
+            "info"
+        );
+
+        const mathData =
+            await solveMath(
+                normalizedProblem
+            );
+
+        const mathematicalSolution =
+            extractMessageContent(
+                mathData
+            );
+
+        if (!mathematicalSolution.trim()) {
+
+            throw new Error(
+                "Math model returned an empty response."
+            );
+        }
+
+        const thinking =
+            extractThinking(
+                mathData,
+                mathematicalSolution
+            );
+
+        setStep(
+            3,
+            "complete",
+            "Complete"
+        );
+
+        log(
+            "Mathematical reasoning completed.",
+            "success"
+        );
+
+
+        /* --------------------------------------------------------
+           STEP 4 — FINAL RESPONSE
+           -------------------------------------------------------- */
+
+        setStep(
+            4,
+            "running",
+            "Formatting"
+        );
+
+        setBottomStatus(
+            "Preparing final answer...",
+            "Formatting the mathematical solution."
+        );
+
+        const finalAnswer =
+            await formatFinalAnswer(
+                normalizedProblem,
+                mathematicalSolution
+            );
+
+        setStep(
+            4,
+            "complete",
+            "Complete"
+        );
+
+        renderResult(
+            finalAnswer,
+            thinking,
+            normalizedProblem
+        );
+
+        state.lastResult =
+            finalAnswer;
+
+        setBottomStatus(
+            "Complete",
+            "The problem has been solved."
+        );
+
+        log(
+            "Workflow completed successfully.",
+            "success"
+        );
+
+    } catch (error) {
+
+        console.error(error);
+
+        log(
+            error.message,
+            "error"
+        );
+
+        setBottomStatus(
+            "Workflow failed",
+            error.message
+        );
+
+        toast(
+            error.message,
+            "error"
+        );
+
+    } finally {
+
+        state.running = false;
+
+        elements.solveButton.disabled =
+            false;
+
+        elements.solveButton.textContent =
+            "Solve problem";
+    }
+}
+
+
+/* ================================================================
+   RESULT RENDERING
+   ================================================================ */
+
+function renderResult(
+    answer,
+    thinking,
+    normalizedProblem
+) {
+
+    elements.result.innerHTML = "";
+
+    if (
+        elements.showThinking.checked &&
+        thinking
+    ) {
+
+        const thinkingCard =
+            document.createElement("div");
+
+        thinkingCard.className =
+            "result-card";
+
+        thinkingCard.style.marginBottom =
+            "12px";
+
+        thinkingCard.innerHTML = `
+            <h3>🧠 Reasoning</h3>
+            <div>${markdownToHtml(thinking)}</div>
+        `;
+
+        elements.result.appendChild(
+            thinkingCard
+        );
+    }
+
+
+    const answerCard =
+        document.createElement("div");
+
+    answerCard.className =
+        "result-card";
+
+    answerCard.innerHTML = `
+        <h2>Solution</h2>
+        <div>${markdownToHtml(answer)}</div>
+    `;
+
+    elements.result.appendChild(
+        answerCard
+    );
+
+
+    const normalizedCard =
+        document.createElement("details");
+
+    normalizedCard.style.marginTop =
+        "12px";
+
+    normalizedCard.innerHTML = `
+        <summary style="
+            cursor:pointer;
+            color:var(--text-secondary);
+            font-size:12px;
+            font-weight:600;
+        ">
+            View normalized problem
+        </summary>
+
+        <div
+            class="result-card"
+            style="margin-top:8px;"
+        >
+            ${markdownToHtml(normalizedProblem)}
+        </div>
+    `;
+
+    elements.result.appendChild(
+        normalizedCard
+    );
+}
+
+
+/* ================================================================
+   SIMPLE MARKDOWN RENDERER
+   ================================================================ */
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+
+function markdownToHtml(markdown) {
+
+    let text =
+        escapeHtml(markdown || "");
+
+    /* Code blocks */
+
+    text =
+        text.replace(
+            /```([\s\S]*?)```/g,
+            "<pre><code>$1</code></pre>"
+        );
+
+    /* Inline code */
+
+    text =
+        text.replace(
+            /`([^`]+)`/g,
+            "<code>$1</code>"
+        );
+
+    /* Headings */
+
+    text =
+        text.replace(
+            /^### (.*)$/gm,
+            "<h3>$1</h3>"
+        );
+
+    text =
+        text.replace(
+            /^## (.*)$/gm,
+            "<h2>$1</h2>"
+        );
+
+    text =
+        text.replace(
+            /^# (.*)$/gm,
+            "<h1>$1</h1>"
+        );
+
+    /* Bold */
+
+    text =
+        text.replace(
+            /\*\*(.*?)\*\*/g,
+            "<strong>$1</strong>"
+        );
+
+    /* Italic */
+
+    text =
+        text.replace(
+            /\*(.*?)\*/g,
+            "<em>$1</em>"
+        );
+
+    /* Links */
+
+    text =
+        text.replace(
+            /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+            '<a href="$2" target="_blank" rel="noopener">$1</a>'
+        );
+
+    /* Basic unordered lists */
+
+    text =
+        text.replace(
+            /^[-*] (.*)$/gm,
+            "<li>$1</li>"
+        );
+
+    text =
+        text.replace(
+            /(<li>.*<\/li>\n?)+/g,
+            match => `<ul>${match}</ul>`
+        );
+
+    /* Paragraphs */
+
+    const lines =
+        text.split("\n");
+
+    const output = [];
+
+    let inPre = false;
+
+    for (const line of lines) {
+
+        if (
+            line.startsWith("<pre>")
+        ) {
+
+            inPre = true;
+
+            output.push(line);
+
+            continue;
+        }
+
+        if (
+            line.includes("</pre>")
+        ) {
+
+            inPre = false;
+
+            output.push(line);
+
+            continue;
+        }
+
+        if (inPre) {
+
+            output.push(line);
+
+            continue;
+        }
+
+        if (!line.trim()) {
+
+            output.push("<br>");
+
+            continue;
+        }
+
+        if (
+            line.startsWith("<h1") ||
+            line.startsWith("<h2") ||
+            line.startsWith("<h3") ||
+            line.startsWith("<ul") ||
+            line.startsWith("<li")
+        ) {
+
+            output.push(line);
+
+        } else {
+
+            output.push(
+                `<p>${line}</p>`
+            );
+        }
+    }
+
+    return output.join("");
+}
+
+
+/* ================================================================
+   WORKFLOW UI
+   ================================================================ */
+
+function setStep(
+    number,
+    status,
+    text
+) {
+
+    const step =
+        $(`step-${number}`);
+
+    const statusElement =
+        $(`step-${number}-status`);
+
+    step.classList.remove(
+        "running",
+        "complete",
+        "error"
+    );
+
+    if (status) {
+        step.classList.add(status);
+    }
+
+    statusElement.textContent =
+        text;
+}
+
+
+function resetWorkflow() {
+
+    for (let i = 1; i <= 4; i++) {
+
+        setStep(
+            i,
+            "",
+            "Waiting"
+        );
+    }
+}
+
+
+/* ================================================================
+   FILE HANDLING
+   ================================================================ */
+
+function addFiles(files) {
+
+    for (const file of files) {
+
+        state.attachments.push({
+            id:
+                crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : `${Date.now()}-${Math.random()}`,
+
+            file
+        });
+    }
+
+    renderAttachments();
+}
+
+
+function removeAttachment(id) {
+
+    state.attachments =
+        state.attachments.filter(
+            item => item.id !== id
+        );
+
+    renderAttachments();
+}
+
+
+function renderAttachments() {
+
+    elements.attachmentList.innerHTML =
+        "";
+
+    state.attachments.forEach(
+        item => {
+
+            const row =
+                document.createElement("div");
+
+            row.className =
+                "attachment";
+
+            const icon =
+                item.file.type.startsWith(
+                    "image/"
+                )
+                    ? "🖼️"
+                    : "📄";
+
+            row.innerHTML = `
+
+                <span>${icon}</span>
+
+                <span class="attachment-name">
+                    ${escapeHtml(item.file.name)}
+                </span>
+
+                <span style="color:var(--muted);">
+                    ${formatBytes(item.file.size)}
+                </span>
+
+                <button
+                    class="attachment-remove"
+                    type="button"
+                    title="Remove"
+                >
+                    ×
+                </button>
+            `;
+
+            row.querySelector(
+                ".attachment-remove"
+            ).addEventListener(
+                "click",
+                () =>
+                    removeAttachment(item.id)
+            );
+
+            elements.attachmentList.appendChild(
+                row
+            );
+        }
+    );
+}
+
+
+function formatBytes(bytes) {
+
+    if (!bytes) {
+        return "0 B";
+    }
+
+    const units = [
+        "B",
+        "KB",
+        "MB",
+        "GB"
+    ];
+
+    const index =
+        Math.floor(
+            Math.log(bytes) /
+            Math.log(1024)
+        );
+
+    return (
+        bytes /
+        Math.pow(1024, index)
+    ).toFixed(index === 0 ? 0 : 1)
+        + " " +
+        units[index];
+}
+
+
+/* ================================================================
+   LOGGING
+   ================================================================ */
+
+function log(
+    message,
+    type = "info"
+) {
+
+    const line =
+        document.createElement("div");
+
+    line.className =
+        `log-line log-${type}`;
+
+    const now =
+        new Date()
+            .toLocaleTimeString();
+
+    line.innerHTML =
+        `<span class="log-time">[${now}]</span> ${escapeHtml(message)}`;
+
+    elements.log.appendChild(
+        line
+    );
+
+    elements.log.scrollTop =
+        elements.log.scrollHeight;
+}
+
+
+function clearLog() {
+
+    elements.log.innerHTML = "";
+}
+
+
+/* ================================================================
+   STATUS
+   ================================================================ */
+
+function setBottomStatus(
+    status,
+    detail
+) {
+
+    elements.bottomStatus.textContent =
+        status;
+
+    elements.bottomDetail.textContent =
+        ` ${detail}`;
+}
+
+
+/* ================================================================
+   TOAST
+   ================================================================ */
+
+function toast(
+    message,
+    type = "info"
+) {
+
+    const element =
+        document.createElement("div");
+
+    element.className =
+        `toast ${type}`;
+
+    element.textContent =
+        message;
+
+    elements.toastContainer.appendChild(
+        element
+    );
+
+    setTimeout(
+        () => {
+
+            element.remove();
+
+        },
+        4000
+    );
+}
+
+
+/* ================================================================
+   UTILITIES
+   ================================================================ */
+
+function capitalize(value) {
+
+    if (!value) {
+        return "";
+    }
+
+    return (
+        value.charAt(0).toUpperCase() +
+        value.slice(1)
+    );
+}
+
+
+/* ================================================================
+   COPY
+   ================================================================ */
+
+async function copyResult() {
+
+    if (!state.lastResult) {
+
+        toast(
+            "There is no result to copy.",
+            "warning"
+        );
+
+        return;
+    }
+
+    try {
+
+        await navigator.clipboard.writeText(
+            state.lastResult
+        );
+
+        toast(
+            "Result copied.",
+            "success"
+        );
+
+    } catch (error) {
+
+        toast(
+            "Could not copy the result.",
+            "error"
+        );
+    }
+}
+
+
+/* ================================================================
+   EVENT HANDLERS
+   ================================================================ */
+
+elements.problemInput.addEventListener(
+    "input",
+    () => {
+
+        const length =
+            elements.problemInput.value.length;
+
+        elements.characterCount.textContent =
+            `${length.toLocaleString()} character${length === 1 ? "" : "s"}`;
+    }
+);
+
+
+/* ---------------------------------------------------------------
+   FILE INPUT
+   --------------------------------------------------------------- */
+
+elements.dropzone.addEventListener(
+    "click",
+    event => {
+
+        if (
+            event.target.closest(
+                "button"
+            )
+        ) {
+            return;
+        }
+
+        elements.fileInput.click();
+    }
+);
+
+
+elements.fileInput.addEventListener(
+    "change",
+    event => {
+
+        addFiles(
+            Array.from(
+                event.target.files
+            )
+        );
+
+        event.target.value = "";
+    }
+);
+
+
+/* ---------------------------------------------------------------
+   DRAG & DROP
+   --------------------------------------------------------------- */
+
+elements.dropzone.addEventListener(
+    "dragover",
+    event => {
+
+        event.preventDefault();
+
+        elements.dropzone.classList.add(
+            "dragover"
+        );
+    }
+);
+
+
+elements.dropzone.addEventListener(
+    "dragleave",
+    () => {
+
+        elements.dropzone.classList.remove(
+            "dragover"
+        );
+    }
+);
+
+
+elements.dropzone.addEventListener(
+    "drop",
+    event => {
+
+        event.preventDefault();
+
+        elements.dropzone.classList.remove(
+            "dragover"
+        );
+
+        addFiles(
+            Array.from(
+                event.dataTransfer.files
+            )
+        );
+    }
+);
+
+
+/* ---------------------------------------------------------------
+   SERVER INPUTS
+   --------------------------------------------------------------- */
+
+elements.visionServer.addEventListener(
+    "change",
+    async () => {
+
+        state.config.visionServerUrl =
+            normalizeUrl(
+                elements.visionServer.value
+            );
+
+        saveConfig();
+
+        await testServer(
+            "vision",
+            elements.visionServer.value
+        );
+    }
+);
+
+
+elements.mathServer.addEventListener(
+    "change",
+    async () => {
+
+        state.config.mathServerUrl =
+            normalizeUrl(
+                elements.mathServer.value
+            );
+
+        saveConfig();
+
+        await testServer(
+            "math",
+            elements.mathServer.value
+        );
+    }
+);
+
+
+/* ---------------------------------------------------------------
+   TEST BUTTONS
+   --------------------------------------------------------------- */
+
+elements.testVision.addEventListener(
+    "click",
+    () =>
+        testServer(
+            "vision",
+            elements.visionServer.value
+        )
+);
+
+
+elements.testMath.addEventListener(
+    "click",
+    () =>
+        testServer(
+            "math",
+            elements.mathServer.value
+        )
+);
+
+
+elements.testAll.addEventListener(
+    "click",
+    async () => {
+
+        await Promise.all([
+            testServer(
+                "vision",
+                elements.visionServer.value
+            ),
+
+            testServer(
+                "math",
+                elements.mathServer.value
+            )
+        ]);
+
+        saveConfig();
+    }
+);
+
+
+/* ---------------------------------------------------------------
+   SAVE SETTINGS
+   --------------------------------------------------------------- */
+
+elements.saveSettings.addEventListener(
+    "click",
+    saveConfig
+);
+
+
+/* ---------------------------------------------------------------
+   CLEAR SETTINGS
+   --------------------------------------------------------------- */
+
+elements.clearSettings.addEventListener(
+    "click",
+    clearConfig
+);
+
+
+/* ---------------------------------------------------------------
+   CLEAR INPUT
+   --------------------------------------------------------------- */
+
+elements.clearInput.addEventListener(
+    "click",
+    () => {
+
+        elements.problemInput.value = "";
+
+        elements.characterCount.textContent =
+            "0 characters";
+
+        state.attachments = [];
+
+        renderAttachments();
+
+        resetWorkflow();
+
+        elements.result.innerHTML = `
+            <div class="empty-state">
+
+                <div>
+
+                    <div class="empty-state-icon">
+                        🧠
+                    </div>
+
+                    <div class="empty-state-title">
+                        No result yet
+                    </div>
+
+                    <div class="empty-state-description">
+                        Add a problem or image and click
+                        <strong>Solve problem</strong>.
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+
+        state.lastResult = "";
+
+        clearLog();
+
+        setBottomStatus(
+            "Ready",
+            "Input cleared."
+        );
+    }
+);
+
+
+/* ---------------------------------------------------------------
+   SOLVE
+   --------------------------------------------------------------- */
+
+elements.solveButton.addEventListener(
+    "click",
+    executeWorkflow
+);
+
+
+/* ---------------------------------------------------------------
+   COPY
+   --------------------------------------------------------------- */
+
+elements.copyResult.addEventListener(
+    "click",
+    copyResult
+);
+
+
+/* ---------------------------------------------------------------
+   ENTER KEY
+   --------------------------------------------------------------- */
+
+elements.problemInput.addEventListener(
+    "keydown",
+    event => {
+
+        if (
+            event.key === "Enter" &&
+            (event.ctrlKey || event.metaKey)
+        ) {
+
+            event.preventDefault();
+
+            executeWorkflow();
+        }
+    }
+);
+
+
+/* ================================================================
+   INITIALIZATION
+   ================================================================ */
+
+async function initialize() {
+
+    applyConfigToUI();
+
+    resetWorkflow();
+
+    setBottomStatus(
+        "Initializing...",
+        "Testing configured local AI servers."
+    );
+
+    log(
+        "Local AI IDE initialized.",
+        "info"
+    );
+
+    log(
+        `Vision server: ${elements.visionServer.value}`,
+        "info"
+    );
+
+    log(
+        `Math server: ${elements.mathServer.value}`,
+        "info"
+    );
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Vision and Math are tested independently.
+     *
+     * A Vision failure does NOT prevent Math from being tested.
+     */
+
+    await Promise.all([
+        testServer(
+            "vision",
+            elements.visionServer.value
+        ),
+
+        testServer(
+            "math",
+            elements.mathServer.value
+        )
+    ]);
+
+
+    if (
+        state.visionOnline &&
+        state.mathOnline
+    ) {
+
+        setBottomStatus(
+            "Ready",
+            "Vision and Math servers are online."
+        );
+
+    } else if (
+        state.mathOnline
+    ) {
+
+        setBottomStatus(
+            "Partially ready",
+            "Math server is online. Vision server is unavailable."
+        );
+
+    } else {
+
+        setBottomStatus(
+            "Servers unavailable",
+            "Check the server addresses in the sidebar."
+        );
+    }
+}
+
+
+/* ================================================================
+   START
+   ================================================================ */
+
+initialize();
+
 </script>
 
 </body>
