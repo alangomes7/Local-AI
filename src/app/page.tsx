@@ -30,6 +30,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkMath from 'remark-math';
 
 import TerminalPanel, { LogEntry, LogType } from './components/TerminalPanel';
+import CodeBlock from './components/CodeBlock';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -149,6 +150,225 @@ type SSEPayload = {
 };
 
 // ============================================================
+// Code Block & Syntax Highlighting Preprocessing
+// ============================================================
+
+export const detectCodeLanguage = (codeLines: string[]): string => {
+  const text = codeLines.join('\n');
+  if (
+    /#include\s+[<"]|std::|cout\s*<<|cin\s*>>|nullptr|\bint\s+main\s*\(/.test(
+      text,
+    )
+  ) {
+    return 'cpp';
+  }
+  if (
+    /\bdef\s+\w+\s*\(|\bimport\s+[\w.]+|\bfrom\s+\w+\s+import|if\s+__name__\s*==\s*['"]__main__['"]|elif\s+|print\(/.test(
+      text,
+    )
+  ) {
+    return 'python';
+  }
+  if (
+    /\bimport\s+.*\s+from\s+['"]|\bexport\s+(default\s+)?(function|const|class)|\bconsole\.(log|error|warn)\s*\(|\bconst\s+\w+\s*=\s*require\(|=>\s*\{/.test(
+      text,
+    )
+  ) {
+    return 'javascript';
+  }
+  if (
+    /\bpublic\s+class\s+|\bpublic\s+static\s+void\s+main|\bSystem\.out\.println/.test(
+      text,
+    )
+  ) {
+    return 'java';
+  }
+  if (/\busing\s+System|\bnamespace\s+\w+|\bConsole\.WriteLine/.test(text)) {
+    return 'csharp';
+  }
+  if (/\bfn\s+main\s*\(|\blet\s+mut\s+|\bimpl\s+\w+|println!\s*\(/.test(text)) {
+    return 'rust';
+  }
+  if (/\bpackage\s+main|\bfunc\s+main\s*\(|\bfmt\.Println/.test(text)) {
+    return 'go';
+  }
+  if (/^<!DOCTYPE\s+html>|<html|<head>|<body>|<div\s+/i.test(text)) {
+    return 'html';
+  }
+  if (
+    /\bSELECT\s+.+\s+FROM\s+|\bINSERT\s+INTO\s+|\bCREATE\s+TABLE\s+/i.test(text)
+  ) {
+    return 'sql';
+  }
+  return '';
+};
+
+export const preprocessCodeBlocks = (content: string): string => {
+  if (!content) {
+    return '';
+  }
+
+  let text = content;
+
+  // Auto-close trailing unclosed code fences (e.g. while streaming)
+  const backtickMatches = text.match(/```/g);
+  if (backtickMatches && backtickMatches.length % 2 !== 0) {
+    text += '\n```';
+  }
+
+  const parts = text.split(/(```[\s\S]*?```)/g);
+
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      continue;
+    }
+
+    const lines = parts[i].split('\n');
+    const newLines: string[] = [];
+    let inCode = false;
+    let codeLines: string[] = [];
+
+    const isCodeStart = (lineIdx: number): boolean => {
+      const line = lines[lineIdx];
+      const trimmed = line.trim();
+      if (!trimmed) return false;
+
+      if (
+        /^(#include\s*[<"]|using\s+namespace\s+\w+|import\s+[\w.*]+\s+from|from\s+\w+\s+import|def\s+\w+\s*\(|class\s+\w+[:\s{]|public\s+class\s+|fn\s+main\s*\(|package\s+\w+|func\s+\w+\s*\(|using\s+System;|const\s+\w+\s*=\s*require\(|function\s+\w+\s*\()/.test(
+          trimmed,
+        ) ||
+        /^(int|void|float|double|char|bool|string|auto)\s+\w+\s*\([^)]*\)\s*\{?$/.test(
+          trimmed,
+        )
+      ) {
+        return true;
+      }
+
+      if (/^(\/\/|\/\*)/.test(trimmed)) {
+        for (
+          let k = lineIdx + 1;
+          k < Math.min(lineIdx + 4, lines.length);
+          k++
+        ) {
+          const nextTrimmed = lines[k].trim();
+          if (
+            nextTrimmed &&
+            (/^(#include|using|import|from|def|class|public|fn|package|func|int|void|const|let|var|function)\b/.test(
+              nextTrimmed,
+            ) ||
+              nextTrimmed.endsWith('{') ||
+              nextTrimmed.endsWith(';'))
+          ) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
+    const isProseBoundary = (trimmed: string): boolean => {
+      if (
+        /^(#+\s*|[-*]\s+|\d+\.\s+)?(Explanation|Output|Note|Notes|Usage|How it works|Key points|Result|Summary):?/i.test(
+          trimmed,
+        )
+      ) {
+        return true;
+      }
+      if (/^[A-Z][a-zA-Z\s]{20,}\.$/.test(trimmed) && !/[;{}]/.test(trimmed)) {
+        return true;
+      }
+      return false;
+    };
+
+    const isCodeContinuation = (line: string): boolean => {
+      const trimmed = line.trim();
+      if (!trimmed) return true;
+
+      if (isProseBoundary(trimmed)) return false;
+
+      if (
+        /^(return|if|else|for|while|switch|case|break|continue|try|catch|throw|cout|cin|std::|printf|console\.|System\.out|print\()/.test(
+          trimmed,
+        ) ||
+        /^[{}();]+$/.test(trimmed) ||
+        trimmed.endsWith(';') ||
+        trimmed.endsWith('{') ||
+        trimmed.endsWith('}') ||
+        /^\/\//.test(trimmed) ||
+        /^\/\*|\*\/|^\*/.test(trimmed) ||
+        /^\s{2,}|\t/.test(line)
+      ) {
+        return true;
+      }
+
+      if (
+        /^(int|float|double|char|bool|string|auto|const|let|var)\s+\w+/.test(
+          trimmed,
+        )
+      ) {
+        return true;
+      }
+
+      return false;
+    };
+
+    for (let j = 0; j < lines.length; j++) {
+      const line = lines[j];
+
+      if (!inCode) {
+        if (isCodeStart(j)) {
+          inCode = true;
+          codeLines = [line];
+        } else {
+          const escapedLine = line.replace(
+            /(^|[\s(])(#include\s*<[^>]+>)([\s),.;]|$)/g,
+            '$1`$2`$3',
+          );
+          newLines.push(escapedLine);
+        }
+      } else {
+        if (isCodeContinuation(line)) {
+          codeLines.push(line);
+        } else {
+          while (
+            codeLines.length > 0 &&
+            !codeLines[codeLines.length - 1].trim()
+          ) {
+            codeLines.pop();
+          }
+          const lang = detectCodeLanguage(codeLines) || '';
+          newLines.push(`\`\`\`${lang}`);
+          newLines.push(...codeLines);
+          newLines.push('```');
+          const escapedLine = line.replace(
+            /(^|[\s(])(#include\s*<[^>]+>)([\s),.;]|$)/g,
+            '$1`$2`$3',
+          );
+          newLines.push(escapedLine);
+          inCode = false;
+          codeLines = [];
+        }
+      }
+    }
+
+    if (inCode && codeLines.length > 0) {
+      while (codeLines.length > 0 && !codeLines[codeLines.length - 1].trim()) {
+        codeLines.pop();
+      }
+      const lang = detectCodeLanguage(codeLines) || '';
+      newLines.push(`\`\`\`${lang}`);
+      newLines.push(...codeLines);
+      newLines.push('```');
+    }
+
+    parts[i] = newLines.join('\n');
+  }
+
+  return parts.join('');
+};
+
+// ============================================================
 // Markdown Export Utilities
 // ============================================================
 
@@ -158,7 +378,11 @@ export function exportChatToMarkdown(conversation: Conversation): string {
 
   for (const message of conversation.messages || []) {
     const roleHeading = message.role === 'user' ? '## User' : '## AI';
-    const content = (message.content || '').trim();
+    const rawContent = (message.content || '').trim();
+    const content =
+      message.role === 'assistant'
+        ? preprocessCodeBlocks(rawContent)
+        : rawContent;
     if (content) {
       sections.push(`${roleHeading}\n${content}`);
     } else {
@@ -536,22 +760,8 @@ export default function ChatPage() {
     }
   }, [serverUrl]);
 
-  useEffect(() => {
-    fetchRam();
-  }, [fetchRam]);
-
-  useEffect(() => {
-    if (!showLoadedPanel) {
-      return;
-    }
-
-    const interval = setInterval(fetchRam, 2500);
-
-    return () => clearInterval(interval);
-  }, [showLoadedPanel, fetchRam]);
-
   // ============================================================
-  // Loaded models
+  // Loaded models & Memory fetching
   // ============================================================
 
   const fetchLoadedModels = useCallback(async () => {
@@ -611,19 +821,27 @@ export default function ChatPage() {
     }
   }, [serverUrl, selectedModel]);
 
+  // Continuous background polling so the UI automatically updates
+  // whenever models are loaded or unloaded by any action
   useEffect(() => {
     fetchLoadedModels();
-  }, [fetchLoadedModels]);
+    fetchRam();
 
-  useEffect(() => {
-    if (!showLoadedPanel) {
-      return;
-    }
-
-    const interval = setInterval(fetchLoadedModels, 3000);
+    const interval = setInterval(() => {
+      fetchLoadedModels();
+      fetchRam();
+    }, 2500);
 
     return () => clearInterval(interval);
-  }, [showLoadedPanel, fetchLoadedModels]);
+  }, [fetchLoadedModels, fetchRam]);
+
+  // Immediately refresh whenever the loaded models panel is opened
+  useEffect(() => {
+    if (showLoadedPanel) {
+      fetchLoadedModels();
+      fetchRam();
+    }
+  }, [showLoadedPanel, fetchLoadedModels, fetchRam]);
 
   // ============================================================
   // Determine active chat model
@@ -736,10 +954,22 @@ export default function ChatPage() {
       }
 
       await fetchLoadedModels();
+      await fetchRam();
 
+      setShowLoadedPanel(true);
       setModelStatus('loaded');
 
       addLog(`${selectedModel} loaded.`, 'success');
+
+      setTimeout(() => {
+        fetchLoadedModels();
+        fetchRam();
+      }, 500);
+
+      setTimeout(() => {
+        fetchLoadedModels();
+        fetchRam();
+      }, 1500);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
 
@@ -779,6 +1009,7 @@ export default function ChatPage() {
       }
 
       await fetchLoadedModels();
+      await fetchRam();
 
       if (
         modelId === selectedModel ||
@@ -792,6 +1023,11 @@ export default function ChatPage() {
       }
 
       addLog(`${modelId} unloaded.`, 'success');
+
+      setTimeout(() => {
+        fetchLoadedModels();
+        fetchRam();
+      }, 500);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
 
@@ -827,7 +1063,15 @@ export default function ChatPage() {
       setActiveChatModel('');
       setModelStatus('unloaded');
 
+      await fetchLoadedModels();
+      await fetchRam();
+
       addLog('All models unloaded.', 'success');
+
+      setTimeout(() => {
+        fetchLoadedModels();
+        fetchRam();
+      }, 500);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
 
@@ -952,6 +1196,42 @@ export default function ChatPage() {
 
     return parts.join('');
   };
+
+  const formatMarkdownContent = (content?: string): string => {
+    if (!content) return '';
+    return preprocessLaTeX(preprocessCodeBlocks(content));
+  };
+
+  const markdownComponents = useMemo(
+    () => ({
+      pre({ children }: any) {
+        return <>{children}</>;
+      },
+      code({ node, className, children, ...props }: any) {
+        const match = /language-(\w+)/.exec(className || '');
+        const codeString = String(children || '').replace(/\n$/, '');
+
+        if (match || codeString.includes('\n')) {
+          return (
+            <CodeBlock
+              language={match ? match[1] : undefined}
+              code={codeString}
+            />
+          );
+        }
+
+        return (
+          <code
+            className="px-1.5 py-0.5 rounded bg-neutral-800 text-emerald-300 font-mono text-xs border border-neutral-700/60"
+            {...props}
+          >
+            {children}
+          </code>
+        );
+      },
+    }),
+    [],
+  );
 
   // ============================================================
   // Clean leaked model chat-template tokens
@@ -1858,6 +2138,10 @@ export default function ChatPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+
+      // Auto-refresh loaded models and memory in case server loaded a model during inference
+      fetchLoadedModels();
+      fetchRam();
     }
   };
 
@@ -2039,7 +2323,16 @@ export default function ChatPage() {
             <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                onClick={() => setShowLoadedPanel((value) => !value)}
+                onClick={() => {
+                  setShowLoadedPanel((value) => {
+                    const next = !value;
+                    if (next) {
+                      fetchLoadedModels();
+                      fetchRam();
+                    }
+                    return next;
+                  });
+                }}
                 className={`p-1.5 rounded transition relative ${
                   showLoadedPanel ? 'text-sky-400' : 'text-neutral-400'
                 }`}
@@ -2482,8 +2775,9 @@ export default function ChatPage() {
                                           remarkBreaks,
                                         ]}
                                         rehypePlugins={[rehypeKatex]}
+                                        components={markdownComponents}
                                       >
-                                        {preprocessLaTeX(msg.reasoning)}
+                                        {formatMarkdownContent(msg.reasoning)}
                                       </ReactMarkdown>
                                     </div>
                                   )}
@@ -2497,8 +2791,9 @@ export default function ChatPage() {
                                   <ReactMarkdown
                                     remarkPlugins={[remarkMath, remarkBreaks]}
                                     rehypePlugins={[rehypeKatex]}
+                                    components={markdownComponents}
                                   >
-                                    {preprocessLaTeX(msg.content)}
+                                    {formatMarkdownContent(msg.content)}
                                   </ReactMarkdown>
                                 </div>
                               )}

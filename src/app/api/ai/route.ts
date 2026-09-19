@@ -108,7 +108,7 @@ ${fileText}
     const history = rawHistory ? JSON.parse(rawHistory) : [];
 
     let systemPrompt =
-      'You are a helpful AI assistant. Answer the user based on their prompt and any provided file context.';
+      'You are a helpful AI assistant. Answer the user based on their prompt and any provided file context. When writing code, ALWAYS format it inside standard markdown code blocks with the correct language identifier (e.g. ```cpp, ```python, ```javascript, etc.).';
 
     if (!enableThinking) {
       systemPrompt +=

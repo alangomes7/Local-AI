@@ -50,3 +50,37 @@ body {
   scrollbar-color: #3f3f46 transparent;
 }
 
+/* Syntax Highlighting overrides for Dark UI */
+.hljs {
+  background: transparent !important;
+}
+
+.hljs-keyword,
+.hljs-operator {
+  color: #c678dd !important;
+}
+
+.hljs-string {
+  color: #98c379 !important;
+}
+
+.hljs-comment {
+  color: #64748b !important;
+  font-style: italic;
+}
+
+.hljs-number,
+.hljs-literal {
+  color: #d19a66 !important;
+}
+
+.hljs-title,
+.hljs-function {
+  color: #61aeee !important;
+}
+
+.hljs-meta,
+.hljs-meta-keyword {
+  color: #e5c07b !important;
+}
+
