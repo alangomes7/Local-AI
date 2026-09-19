@@ -5,23 +5,22 @@ export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const serverUrl = searchParams.get('serverUrl');
+  const serverUrl =
+    searchParams.get('serverUrl') ||
+    'http://localhost:8000/v1/chat/completions';
+  const endpoint = serverUrl.replace(
+    /\/chat\/completions\/?$/,
+    '/system/memory',
+  );
 
-  // If serverUrl is provided, try to fetch live memory status from the AI server
-  if (serverUrl) {
-    try {
-      const endpoint = serverUrl.replace(
-        /\/chat\/completions\/?$/,
-        '/system/memory',
-      );
-      const res = await fetch(endpoint, { cache: 'no-store' });
-      if (res.ok) {
-        const serverData = await res.json();
-        return NextResponse.json(serverData);
-      }
-    } catch {
-      // Fallback to local host RAM metrics below
+  try {
+    const res = await fetch(endpoint, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      return NextResponse.json(data);
     }
+  } catch {
+    // Fall back to local OS memory
   }
 
   const total = os.totalmem();
@@ -30,15 +29,10 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     primary_device: 'ram',
-    total: (total / 1024 ** 3).toFixed(2),
-    used: (used / 1024 ** 3).toFixed(2),
-    available: (free / 1024 ** 3).toFixed(2),
-    free: (free / 1024 ** 3).toFixed(2),
-    percentage: total > 0 ? ((used / total) * 100).toFixed(1) : '0',
-    availablePercentage: total > 0 ? ((free / total) * 100).toFixed(1) : '100',
     total_bytes: total,
     used_bytes: used,
     available_bytes: free,
+    percentage: total > 0 ? Number(((used / total) * 100).toFixed(1)) : 0,
     total_human: `${(total / 1024 ** 3).toFixed(2)} GB`,
     used_human: `${(used / 1024 ** 3).toFixed(2)} GB`,
     available_human: `${(free / 1024 ** 3).toFixed(2)} GB`,
@@ -51,5 +45,6 @@ export async function GET(req: Request) {
       used_human: `${(used / 1024 ** 3).toFixed(2)} GB`,
       available_human: `${(free / 1024 ** 3).toFixed(2)} GB`,
     },
+    gpu: null,
   });
 }

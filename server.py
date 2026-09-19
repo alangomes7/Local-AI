@@ -247,8 +247,148 @@ def canonical_model_name(
 
 
 # ============================================================
-# Loaded models
+# Loaded models & Memory estimation
 # ============================================================
+
+def estimate_model_memory_bytes(model_obj: Any) -> int:
+    """Calculates the memory footprint of a loaded model in bytes."""
+    if model_obj is None:
+        return 0
+
+    target = getattr(model_obj, "model", model_obj)
+
+    # 1. Hugging Face PreTrainedModel footprint
+    try:
+        if hasattr(target, "get_memory_footprint"):
+            footprint = target.get_memory_footprint()
+            if isinstance(footprint, (int, float)) and footprint > 0:
+                return int(footprint)
+    except Exception:
+        pass
+
+    # 2. PyTorch parameters and buffers summation
+    try:
+        total_bytes = 0
+        if hasattr(target, "parameters"):
+            for p in target.parameters():
+                total_bytes += p.nelement() * p.element_size()
+        if hasattr(target, "buffers"):
+            for b in target.buffers():
+                total_bytes += b.nelement() * b.element_size()
+        if total_bytes > 0:
+            return int(total_bytes)
+    except Exception:
+        pass
+
+    # 3. Model memory property if available
+    try:
+        if hasattr(target, "model_memory"):
+            val = getattr(target, "model_memory")
+            if isinstance(val, (int, float)):
+                return int(val)
+    except Exception:
+        pass
+
+    return 0
+
+
+def format_memory_size(num_bytes: int) -> str:
+    """Formats bytes into a readable string (e.g. 4.2 GB or 850 MB)."""
+    if num_bytes <= 0:
+        return "0 MB"
+    gb = num_bytes / (1024 ** 3)
+    if gb >= 1.0:
+        return f"{gb:.2f} GB"
+    mb = num_bytes / (1024 ** 2)
+    return f"{mb:.1f} MB"
+
+
+def get_system_memory_status() -> dict[str, Any]:
+    """
+    Returns system and GPU memory status including total, used, available,
+    and percentage statistics.
+    """
+    result: dict[str, Any] = {
+        "primary_device": "ram",
+        "total_bytes": 0,
+        "used_bytes": 0,
+        "available_bytes": 0,
+        "percentage": 0.0,
+        "total_human": "0 MB",
+        "used_human": "0 MB",
+        "available_human": "0 MB",
+        "system_ram": None,
+        "gpu": None,
+    }
+
+    # 1. System RAM via psutil
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        total_ram = int(vm.total)
+        used_ram = int(vm.used)
+        available_ram = int(vm.available)
+        free_ram = int(vm.free)
+        pct_ram = round(float(vm.percent), 1)
+
+        result["system_ram"] = {
+            "total_bytes": total_ram,
+            "used_bytes": used_ram,
+            "available_bytes": available_ram,
+            "free_bytes": free_ram,
+            "percentage": pct_ram,
+            "total_human": format_memory_size(total_ram),
+            "used_human": format_memory_size(used_ram),
+            "available_human": format_memory_size(available_ram),
+        }
+        result["total_bytes"] = total_ram
+        result["used_bytes"] = used_ram
+        result["available_bytes"] = available_ram
+        result["percentage"] = pct_ram
+        result["total_human"] = format_memory_size(total_ram)
+        result["used_human"] = format_memory_size(used_ram)
+        result["available_human"] = format_memory_size(available_ram)
+    except Exception:
+        logger.exception("Failed to collect system RAM metrics.")
+
+    # 2. GPU / VRAM via PyTorch CUDA
+    try:
+        if torch.cuda.is_available():
+            dev_idx = torch.cuda.current_device() if torch.cuda.device_count() > 0 else 0
+            free_b, total_b = torch.cuda.mem_get_info(dev_idx)
+            used_b = total_b - free_b
+            allocated_b = torch.cuda.memory_allocated(dev_idx)
+            reserved_b = torch.cuda.memory_reserved(dev_idx)
+            pct_gpu = round(((total_b - free_b) / total_b) * 100, 1) if total_b > 0 else 0.0
+
+            gpu_stats = {
+                "device_name": torch.cuda.get_device_name(dev_idx),
+                "device_index": dev_idx,
+                "total_bytes": total_b,
+                "used_bytes": used_b,
+                "available_bytes": free_b,
+                "allocated_bytes": allocated_b,
+                "reserved_bytes": reserved_b,
+                "percentage": pct_gpu,
+                "total_human": format_memory_size(total_b),
+                "used_human": format_memory_size(used_b),
+                "available_human": format_memory_size(free_b),
+                "allocated_human": format_memory_size(allocated_b),
+            }
+            result["gpu"] = gpu_stats
+            result["primary_device"] = "gpu"
+            result["total_bytes"] = total_b
+            result["used_bytes"] = used_b
+            result["available_bytes"] = free_b
+            result["percentage"] = pct_gpu
+            result["total_human"] = format_memory_size(total_b)
+            result["used_human"] = format_memory_size(used_b)
+            result["available_human"] = format_memory_size(free_b)
+    except Exception:
+        logger.exception("Failed to collect GPU VRAM metrics.")
+
+    return result
+
 
 def get_loaded_models() -> list[dict[str, Any]]:
     manager = get_model_manager()
@@ -273,6 +413,10 @@ def get_loaded_models() -> list[dict[str, Any]]:
                 None,
             )
 
+            memory_bytes = estimate_model_memory_bytes(model_object)
+            memory_mb = round(memory_bytes / (1024 * 1024), 2)
+            memory_human = format_memory_size(memory_bytes)
+
             result.append(
                 {
                     "id": model_id,
@@ -282,6 +426,9 @@ def get_loaded_models() -> list[dict[str, Any]]:
                     "processor_loaded": (
                         processor_object is not None
                     ),
+                    "memory_bytes": memory_bytes,
+                    "memory_mb": memory_mb,
+                    "memory_human": memory_human,
                     "timeout": getattr(
                         timed_model,
                         "timeout_seconds",
@@ -533,16 +680,60 @@ def add_custom_routes(
                 get_loaded_models
             )
 
+            total_memory_bytes = sum(m.get("memory_bytes", 0) for m in models)
+            memory_status = await asyncio.to_thread(
+                get_system_memory_status
+            )
+
             return {
                 "object": "list",
                 "data": models,
                 "count": len(models),
+                "total_memory_bytes": total_memory_bytes,
+                "total_memory_human": format_memory_size(total_memory_bytes),
+                "memory_status": memory_status,
             }
 
         except Exception as exc:
 
             logger.exception(
                 "Failed to inspect loaded models."
+            )
+
+            raise HTTPException(
+                status_code=500,
+                detail=str(exc),
+            ) from exc
+
+    # --------------------------------------------------------
+    # System and GPU Memory
+    # --------------------------------------------------------
+
+    @application.get(
+        "/v1/system/memory"
+    )
+    async def system_memory_endpoint():
+
+        try:
+
+            status = await asyncio.to_thread(
+                get_system_memory_status
+            )
+
+            models = await asyncio.to_thread(
+                get_loaded_models
+            )
+
+            total_model_bytes = sum(m.get("memory_bytes", 0) for m in models)
+            status["models_memory_bytes"] = total_model_bytes
+            status["models_memory_human"] = format_memory_size(total_model_bytes)
+
+            return status
+
+        except Exception as exc:
+
+            logger.exception(
+                "Failed to retrieve system memory status."
             )
 
             raise HTTPException(

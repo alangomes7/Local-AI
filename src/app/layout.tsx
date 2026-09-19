@@ -29,7 +29,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="h-full overflow-hidden flex flex-col">{children}</body>
     </html>
   );
 }
