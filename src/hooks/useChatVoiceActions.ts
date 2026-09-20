@@ -8,9 +8,10 @@ import {
   getCachedAudio,
   saveCachedAudio,
 } from '../utils/audioCache';
+import { isVoiceOrToolModel } from '../utils/chat';
 
-const STT_MODEL = 'nvidia/parakeet-tdt-0.6b-v3';
-const TTS_MODEL = 'hexgrad/Kokoro-82M';
+const STT_MODEL = 'facebook/hf-seamless-m4t-medium';
+const TTS_MODEL = 'facebook/hf-seamless-m4t-medium';
 
 export function useChatVoiceActions(
   store: Store,
@@ -35,12 +36,24 @@ export function useChatVoiceActions(
     setPendingVoiceNote,
     setPrompt,
     setLoading,
+    loadedModels,
     ttsVoice,
     ttsSpeed,
+    speechLanguage,
   } = store;
   const voiceModeRef = useRef(false);
   const ttsRequestsRef = useRef(new Map<string, Promise<Blob>>());
   const audioPlaybackGenerationRef = useRef(0);
+
+  const resolveChatModel = useCallback((): string => {
+    if (activeChatModel && !isVoiceOrToolModel(activeChatModel)) {
+      return activeChatModel;
+    }
+    const chatModel = loadedModels.find(
+      (m) => m.loaded && !isVoiceOrToolModel(m.id),
+    );
+    return chatModel?.id || '';
+  }, [activeChatModel, loadedModels]);
 
   const changeAudioModelState = useCallback(
     async (
@@ -80,7 +93,7 @@ export function useChatVoiceActions(
       formData.append('file', file);
       formData.append('serverUrl', serverUrl);
       formData.append('model', STT_MODEL);
-      formData.append('language', 'auto');
+      formData.append('language', speechLanguage);
       const response = await fetch('/api/audio/transcribe', {
         method: 'POST',
         body: formData,
@@ -94,7 +107,7 @@ export function useChatVoiceActions(
       if (!text) throw new Error('The transcription model returned no text.');
       return text;
     },
-    [serverUrl],
+    [serverUrl, speechLanguage],
   );
 
   useEffect(() => {
@@ -108,7 +121,7 @@ export function useChatVoiceActions(
           message:
             error instanceof Error
               ? error.message
-              : 'Unable to load voice models.',
+              : 'Failed to load voice models.',
         });
       });
     } else if (!isVoiceChatActive && voiceModeRef.current) {
@@ -122,8 +135,15 @@ export function useChatVoiceActions(
     showToast,
     unloadVoiceModels,
   ]);
+
   const generateLLMResponseText = useCallback(
     async (text: string): Promise<string> => {
+      const targetChatModel = resolveChatModel();
+      if (!targetChatModel) {
+        throw new Error(
+          'No chat model loaded. Please load a chat model (e.g. Qwen or Llama) from the top bar.',
+        );
+      }
       const response = await fetch(serverUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,18 +152,22 @@ export function useChatVoiceActions(
             ...messages.map(({ role, content }) => ({ role, content })),
             { role: 'user', content: text },
           ],
-          model: activeChatModel,
+          model: targetChatModel,
           stream: false,
         }),
       });
-      if (!response.ok) throw new Error('LLM Generation Failed');
+      if (!response.ok) {
+        const errDetail = await response.text();
+        throw new Error(errDetail || 'LLM Generation Failed');
+      }
       const data = (await response.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
       };
       return data.choices?.[0]?.message?.content ?? '';
     },
-    [activeChatModel, messages, serverUrl],
+    [messages, resolveChatModel, serverUrl],
   );
+
   const processVoiceChatTurn = useCallback(
     async (audioBlob: Blob) => {
       setVoiceChatState('transcribing');
@@ -151,7 +175,7 @@ export function useChatVoiceActions(
         const formData = new FormData();
         formData.append('file', audioBlob, 'voice.webm');
         formData.append('model', STT_MODEL);
-        formData.append('language', 'auto');
+        formData.append('language', speechLanguage);
         const sttResponse = await fetch(
           `${serverUrl.replace(/\/chat\/completions\/?$/, '')}/audio/transcriptions`,
           { method: 'POST', body: formData },
@@ -188,7 +212,7 @@ export function useChatVoiceActions(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: responseText,
-            language: sttData.language || 'en',
+            language: speechLanguage,
             model: TTS_MODEL,
             serverUrl,
             keepLoaded: isVoiceChatActive,
@@ -219,6 +243,7 @@ export function useChatVoiceActions(
       serverUrl,
       setMessages,
       setVoiceChatState,
+      speechLanguage,
     ],
   );
   const stopVoiceChatRecording = useCallback(() => {

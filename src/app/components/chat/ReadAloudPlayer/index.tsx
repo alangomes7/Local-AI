@@ -46,6 +46,8 @@ const LANGUAGE_OPTIONS = [
 ] as const;
 
 const VOICE_LANGUAGE_LABELS: Record<string, string> = {
+  de: 'German',
+  en: 'English',
   a: 'English (US)',
   b: 'English (UK)',
   e: 'Spanish',
@@ -60,6 +62,9 @@ const VOICE_LANGUAGE_LABELS: Record<string, string> = {
 type VoiceOption = { id: string; label: string; language: string };
 
 function getVoiceLanguageId(voiceId: string): string | null {
+  if (LANGUAGE_OPTIONS.some((option) => option.id === voiceId)) {
+    return voiceId;
+  }
   const prefix = voiceId[0];
   if (prefix === 'a' || prefix === 'b') return 'en';
   return (
@@ -128,7 +133,10 @@ export default function ReadAloudPlayer({
   const [voices, setVoices] = useState<VoiceOption[]>(
     POPULAR_VOICES.map((voiceOption) => ({
       ...voiceOption,
-      language: VOICE_LANGUAGE_LABELS[voiceOption.id[0]] || 'Other',
+      language:
+        VOICE_LANGUAGE_LABELS[voiceOption.id] ||
+        VOICE_LANGUAGE_LABELS[voiceOption.id[0]] ||
+        'Other',
     })),
   );
   const detectedLanguage = detectSpeechLanguage(text);
@@ -165,7 +173,10 @@ export default function ReadAloudPlayer({
             if (found) {
               return {
                 ...found,
-                language: VOICE_LANGUAGE_LABELS[v[0]] || 'Other',
+                language:
+                  VOICE_LANGUAGE_LABELS[v] ||
+                  VOICE_LANGUAGE_LABELS[v[0]] ||
+                  'Other',
               };
             }
             const prefix = v.slice(0, 2);
@@ -395,6 +406,7 @@ export default function ReadAloudPlayer({
       // Ignore storage errors
     }
     onVoiceChange(newVoice);
+    void loadAndPlay(newVoice, speed, newLanguage);
   };
 
   const handleLanguageChange = (newLanguage: string) => {

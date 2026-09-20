@@ -62,6 +62,7 @@ export type ChatState = {
   showScrollBottom: boolean;
   ttsVoice: string;
   ttsSpeed: number;
+  speechLanguage: string;
 };
 
 type StateSetter<T> = Dispatch<SetStateAction<T>>;
@@ -122,6 +123,10 @@ const initialState: ChatState = {
     typeof window !== 'undefined' && localStorage.getItem('last_tts_speed')
       ? parseFloat(localStorage.getItem('last_tts_speed')!) || 1.0
       : 1.0,
+  speechLanguage:
+    typeof window !== 'undefined'
+      ? localStorage.getItem('speech_language') || 'en'
+      : 'en',
 };
 
 const setterKey = <K extends keyof ChatState>(key: K) =>

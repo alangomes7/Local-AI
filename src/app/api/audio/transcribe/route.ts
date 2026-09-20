@@ -3,7 +3,7 @@ import { scheduleSttModelUnload } from '../sttModelLifecycle';
 
 export const runtime = 'nodejs';
 
-const DEFAULT_STT_MODEL = 'nvidia/parakeet-tdt-0.6b-v3';
+const DEFAULT_STT_MODEL = 'facebook/hf-seamless-m4t-medium';
 
 function modelEndpoint(serverUrl: string, path: string): string {
   return serverUrl
@@ -13,14 +13,12 @@ function modelEndpoint(serverUrl: string, path: string): string {
 
 export async function POST(req: Request) {
   let serverUrl = 'http://localhost:8000/v1/chat/completions';
-  let model = process.env.AI_STT_MODEL || DEFAULT_STT_MODEL;
+  const model = DEFAULT_STT_MODEL;
 
   try {
     const formData = await req.formData();
     const file = formData.get('file');
     serverUrl = String(formData.get('serverUrl') || serverUrl);
-    model = String(formData.get('model') || model);
-
     if (!(file instanceof File)) {
       return NextResponse.json(
         { error: 'An audio file is required.' },
@@ -52,7 +50,14 @@ export async function POST(req: Request) {
 
     const response = await fetch(
       modelEndpoint(serverUrl, '/v1/audio/transcriptions'),
-      { method: 'POST', body: audioForm, cache: 'no-store' },
+      {
+        method: 'POST',
+        body: audioForm,
+        cache: 'no-store',
+        headers: {
+          'Accept-Language': req.headers.get('accept-language') || 'en',
+        },
+      },
     );
     const responseText = await response.text();
     if (!response.ok) {

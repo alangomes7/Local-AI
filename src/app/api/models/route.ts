@@ -59,6 +59,7 @@ export async function GET(req: Request) {
         const id = String(item?.id || '').toLowerCase();
         return (
           !id.includes('parakeet') &&
+          !id.includes('seamless-m4t') &&
           !id.includes('kokoro') &&
           !id.includes('whisper') &&
           !id.includes('silero') &&

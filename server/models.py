@@ -95,6 +95,7 @@ def _patched_get_gen_models(cache_dir: str | os.PathLike[str] | Any | None = Non
                 "owned_by": model_id.split("/")[0]
                 if "/" in model_id
                 else "local",
+                "capabilities": get_model_capabilities(model_id),
             }
         )
 
@@ -177,6 +178,60 @@ def _is_dedicated_tts_model(model_id: str) -> bool:
     )
 
 
+def is_transcription_or_tts_only_model(model_id: str) -> bool:
+    """
+    Return True if the model is exclusively a transcription (STT) or TTS model
+    and cannot be used for text chat completions.
+    """
+    model_lower = model_id.lower()
+    return (
+        "seamless-m4t" in model_lower
+        or "parakeet" in model_lower
+        or "whisper" in model_lower
+        or "silero" in model_lower
+        or "kokoro" in model_lower
+        or "xtts" in model_lower
+    )
+
+
+def get_model_capabilities(model_id: str) -> dict[str, bool]:
+    """
+    Return capabilities map for a given model ID.
+    """
+    model_lower = model_id.lower()
+    if "seamless-m4t" in model_lower:
+        return {
+            "chat": False,
+            "completion": False,
+            "transcription": True,
+            "translation": True,
+            "tts": True,
+        }
+    if any(k in model_lower for k in ("parakeet", "whisper")):
+        return {
+            "chat": False,
+            "completion": False,
+            "transcription": True,
+            "translation": False,
+            "tts": False,
+        }
+    if any(k in model_lower for k in ("kokoro", "xtts")):
+        return {
+            "chat": False,
+            "completion": False,
+            "transcription": False,
+            "translation": False,
+            "tts": True,
+        }
+    return {
+        "chat": True,
+        "completion": True,
+        "transcription": False,
+        "translation": False,
+        "tts": False,
+    }
+
+
 # ============================================================================
 # Local model manager
 # ============================================================================
@@ -205,6 +260,33 @@ class LocalModelManager(ModelManager):
     # ------------------------------------------------------------------------
 
     def load_model_and_processor(
+        self,
+        model_id_and_revision: str,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        with self._model_locks_guard:
+            lock = self._model_locks.setdefault(
+                model_id_and_revision,
+                threading.RLock(),
+            )
+
+        with lock:
+            loaded_model = self.loaded_models.get(model_id_and_revision)
+            if loaded_model is not None:
+                state.logger.info(
+                    "[MODEL] Already loaded: %s",
+                    model_id_and_revision,
+                )
+                return loaded_model.model, loaded_model.processor
+
+            return self._load_model_and_processor_unlocked(
+                model_id_and_revision,
+                *args,
+                **kwargs,
+            )
+
+    def _load_model_and_processor_unlocked(
         self,
         model_id_and_revision: str,
         *args: Any,
@@ -332,7 +414,7 @@ class LocalModelManager(ModelManager):
         with self._model_locks_guard:
             lock = self._model_locks.setdefault(
                 model_id_and_revision,
-                threading.Lock(),
+                threading.RLock(),
             )
 
         with lock:
@@ -496,6 +578,7 @@ def get_loaded_models() -> list[dict[str, Any]]:
                         "timeout_seconds",
                         None,
                     ),
+                    "capabilities": get_model_capabilities(model_id),
                 }
             )
 
@@ -531,7 +614,7 @@ def _load_with_tokenizer(
     with manager._model_locks_guard:
         lock = manager._model_locks.setdefault(
             model_id,
-            threading.Lock(),
+            threading.RLock(),
         )
 
     # ------------------------------------------------------------------------

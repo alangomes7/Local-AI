@@ -257,16 +257,26 @@ export function useChatServerActions(
     }
   }, [fetchLoadedModels, fetchRam, showLoadedPanel]);
   useEffect(() => {
-    const loaded = loadedModels.filter((model) => model.loaded);
-    if (!loaded.length) {
-      setActiveChatModel('');
+    const loadedChatModels = loadedModels.filter(
+      (model) => model.loaded && !isVoiceOrToolModel(model.id),
+    );
+    if (!loadedChatModels.length) {
+      if (activeChatModel && isVoiceOrToolModel(activeChatModel)) {
+        setActiveChatModel('');
+      }
       return;
     }
-    if (loaded.some((model) => model.id === activeChatModel)) return;
+    if (
+      activeChatModel &&
+      !isVoiceOrToolModel(activeChatModel) &&
+      loadedChatModels.some((model) => model.id === activeChatModel)
+    ) {
+      return;
+    }
     const base = selectedModel.split('@')[0];
     setActiveChatModel(
-      loaded.find((model) => model.id.split('@')[0] === base)?.id ??
-        loaded[0].id,
+      loadedChatModels.find((model) => model.id.split('@')[0] === base)?.id ??
+        loadedChatModels[0].id,
     );
   }, [activeChatModel, loadedModels, selectedModel, setActiveChatModel]);
   const runModelAction = useCallback(

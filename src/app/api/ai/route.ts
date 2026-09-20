@@ -21,6 +21,7 @@ export async function POST(req: Request) {
     const prompt = String(formData.get('prompt') || '').trim();
     const clientServerUrl = String(formData.get('serverUrl') || '').trim();
     const clientModel = String(formData.get('model') || '').trim();
+    const speechLanguage = String(formData.get('speechLanguage') || 'en');
     const enableThinking = formData.get('enableThinking') !== 'false';
     const file = formData.get('file') as File | null;
 
@@ -105,12 +106,9 @@ export async function POST(req: Request) {
               type: file.type || 'audio/webm',
             });
             audioForm.append('file', audioBlob, file.name);
-            audioForm.append(
-              'model',
-              process.env.AI_STT_MODEL || 'nvidia/parakeet-tdt-0.6b-v3',
-            );
-            const sttModel =
-              process.env.AI_STT_MODEL || 'nvidia/parakeet-tdt-0.6b-v3';
+            audioForm.append('model', 'facebook/hf-seamless-m4t-medium');
+            audioForm.append('language', speechLanguage);
+            const sttModel = 'facebook/hf-seamless-m4t-medium';
             const loadResponse = await fetch(
               modelEndpoint(apiEndpoint, '/load_model'),
               {
@@ -132,6 +130,8 @@ export async function POST(req: Request) {
             if (apiKey) {
               tHeaders.Authorization = `Bearer ${apiKey}`;
             }
+            tHeaders['Accept-Language'] =
+              req.headers.get('accept-language') || 'en';
 
             const tRes = await fetch(transcribeEndpoint, {
               method: 'POST',

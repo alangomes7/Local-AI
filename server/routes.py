@@ -12,7 +12,82 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.datastructures import FormData, UploadFile
 
+from . import state
 from .memory import format_memory_size
+
+SEAMLESS_M4T_MODEL = "facebook/hf-seamless-m4t-medium"
+SEAMLESS_LANGUAGE_CODES = {
+    "de": "deu",
+    "en": "eng",
+    "es": "spa",
+    "fr": "fra",
+    "hi": "hin",
+    "it": "ita",
+    "ja": "jpn",
+    "pt": "por",
+    "zh": "cmn",
+}
+
+
+def _transcribe_seamless_audio(
+    audio_bytes: bytes,
+    model_id: str,
+    target_language: str,
+) -> str:
+    import io
+
+    import soundfile as sf
+    import torch
+
+    audio_array, sample_rate = sf.read(
+        io.BytesIO(audio_bytes),
+        dtype="float32",
+    )
+    manager = state.get_model_manager()
+    model, processor = manager.load_model_and_processor(
+        state.canonical_model_name(model_id),
+    )
+    inputs = processor(
+        audio=audio_array,
+        sampling_rate=sample_rate,
+        return_tensors="pt",
+    )
+    device = next(model.parameters()).device
+    inputs = {
+        key: value.to(device) if hasattr(value, "to") else value
+        for key, value in inputs.items()
+    }
+
+    with torch.inference_mode():
+        output_tokens = model.generate(
+            **inputs,
+            tgt_lang=target_language,
+            generate_speech=False,
+        )
+
+    if hasattr(output_tokens, "sequences"):
+        output_tokens = output_tokens.sequences
+    elif isinstance(output_tokens, dict):
+        output_tokens = output_tokens["sequences"]
+    elif isinstance(output_tokens, (tuple, list)):
+        output_tokens = output_tokens[0]
+
+    return processor.decode(
+        output_tokens[0].tolist(),
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+    ).strip()
+
+
+def _resolve_transcription_language(
+    requested_language: Any,
+    accept_language: str | None,
+) -> str:
+    language = str(requested_language or "").strip().lower()
+    if not language or language == "auto":
+        language = (accept_language or "en").split(",", 1)[0]
+    language = language.split("-", 1)[0].split("_", 1)[0]
+    return SEAMLESS_LANGUAGE_CODES.get(language, "eng")
 
 def add_custom_routes(
     application: FastAPI,
@@ -37,7 +112,7 @@ def add_custom_routes(
         transcription handler.
 
         This keeps browser-specific WebM/Opus decoding outside
-        the Parakeet/Transformers pipeline.
+        the SeamlessM4T/Transformers pipeline.
         """
 
         ffmpeg = shutil.which("ffmpeg")
@@ -71,6 +146,11 @@ def add_custom_routes(
                 )
 
             model = model.strip()
+            requested_language = form.get("language")
+            target_language = _resolve_transcription_language(
+                requested_language,
+                request.headers.get("accept-language"),
+            )
 
             logger.info(
                 "Audio transcription request: model=%s filename=%s "
@@ -111,6 +191,24 @@ def add_custom_routes(
                 "(WAV, 16 kHz, mono, PCM S16LE)",
                 len(normalized_bytes),
             )
+
+            if model.split("@", 1)[0] == SEAMLESS_M4T_MODEL:
+                text = await asyncio.to_thread(
+                    _transcribe_seamless_audio,
+                    normalized_bytes,
+                    model,
+                    target_language,
+                )
+                if not text:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="The transcription model returned no text.",
+                    )
+                logger.info(
+                    "SeamlessM4T transcription completed successfully: model=%s",
+                    model,
+                )
+                return JSONResponse({"text": text, "model": model})
 
             normalized_file = _upload_file_from_bytes(
                 normalized_bytes,
@@ -159,7 +257,7 @@ def add_custom_routes(
 
         except Exception:
             logger.exception(
-                "Parakeet/Transformers transcription failed: model=%s",
+                "SeamlessM4T/Transformers transcription failed: model=%s",
                 model,
             )
             raise
@@ -190,32 +288,38 @@ def add_custom_routes(
         if not text:
             raise HTTPException(status_code=400, detail="Missing input text")
 
-        voice_param = body.get("voice") or "af_heart"
-        try:
-            speed_param = float(body.get("speed", 1.0))
-        except (ValueError, TypeError):
-            speed_param = 1.0
-        # Clamp speed between 0.5 and 2.0 as supported by Kokoro
-        speed_param = max(0.5, min(2.0, speed_param))
-            
+        model_id = SEAMLESS_M4T_MODEL
+        language = str(body.get("language") or "en").lower()
+        target_language = SEAMLESS_LANGUAGE_CODES.get(language, "eng")
+
         import io
         from fastapi.responses import Response
 
         def generate_tts():
-            from huggingface_hub import hf_hub_download
             import soundfile as sf
-            
-            model_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
-            voices_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
-            
-            if not hasattr(application.state, "kokoro_model"):
-                from kokoro_onnx import Kokoro
-                application.state.kokoro_model = Kokoro(model_path, voices_path)
-                
-            kokoro = application.state.kokoro_model
-            chosen_voice = voice_param if voice_param in kokoro.get_voices() else "af_heart"
-            audio_array, sample_rate = kokoro.create(text, voice=chosen_voice, speed=speed_param)
-            
+
+            manager = state.get_model_manager()
+            canonical_model_id = state.canonical_model_name(model_id)
+            model, processor = manager.load_model_and_processor(
+                canonical_model_id,
+            )
+            inputs = processor(
+                text=text,
+                src_lang=target_language,
+                return_tensors="pt",
+            )
+            device = next(model.parameters()).device
+            inputs = {
+                key: value.to(device) if hasattr(value, "to") else value
+                for key, value in inputs.items()
+            }
+            generated = model.generate(
+                **inputs,
+                tgt_lang=target_language,
+            )[0]
+            audio_array = generated.detach().cpu().numpy().squeeze()
+            sample_rate = getattr(processor, "sampling_rate", 16000)
+
             wav_io = io.BytesIO()
             sf.write(wav_io, audio_array, sample_rate, format="WAV")
             wav_io.seek(0)
@@ -225,26 +329,12 @@ def add_custom_routes(
             wav_data = await asyncio.to_thread(generate_tts)
             return Response(content=wav_data, media_type="audio/wav")
         except Exception as exc:
-            logger.exception("Kokoro TTS generation failed")
+            logger.exception("SeamlessM4T speech generation failed")
             raise HTTPException(status_code=500, detail=str(exc))
 
     @application.get("/v1/audio/voices")
     async def audio_voices_endpoint() -> Any:
-        def get_all_voices():
-            from huggingface_hub import hf_hub_download
-            model_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
-            voices_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
-            if not hasattr(application.state, "kokoro_model"):
-                from kokoro_onnx import Kokoro
-                application.state.kokoro_model = Kokoro(model_path, voices_path)
-            return application.state.kokoro_model.get_voices()
-
-        try:
-            voices = await asyncio.to_thread(get_all_voices)
-            return {"voices": voices}
-        except Exception as exc:
-            logger.exception("Failed to get Kokoro voices")
-            raise HTTPException(status_code=500, detail=str(exc))
+        return {"voices": list(SEAMLESS_LANGUAGE_CODES)}
 
     @application.get("/v1/models/loaded")
     async def loaded_models_endpoint() -> dict[str, Any]:
@@ -414,7 +504,7 @@ async def _normalize_audio_with_ffmpeg(
         mono
         PCM signed 16-bit
 
-    suitable for Parakeet.
+    suitable for SeamlessM4T.
     """
 
     try:
@@ -432,7 +522,7 @@ async def _normalize_audio_with_ffmpeg(
             "-f",
             "wav",
 
-            # Parakeet-compatible sampling rate
+            # SeamlessM4T-compatible sampling rate
             "-ar",
             "16000",
 

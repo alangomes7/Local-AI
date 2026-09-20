@@ -29,6 +29,7 @@ export function isVoiceOrToolModel(modelId: string): boolean {
   const lower = modelId.toLowerCase();
   return (
     lower.includes('parakeet') ||
+    lower.includes('seamless-m4t') ||
     lower.includes('kokoro') ||
     lower.includes('whisper') ||
     lower.includes('silero') ||

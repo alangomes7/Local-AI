@@ -50,6 +50,7 @@ export function useChatStreamingActions(
     setLastServerError,
     ttsVoice,
     ttsSpeed,
+    speechLanguage,
   } = store;
   const handleSend = useCallback(async () => {
     if (loading) return;
@@ -84,7 +85,7 @@ export function useChatStreamingActions(
         const transcriptionForm = new FormData();
         transcriptionForm.append('file', file);
         transcriptionForm.append('serverUrl', serverUrl);
-        transcriptionForm.append('language', 'auto');
+        transcriptionForm.append('language', speechLanguage);
         const transcriptionResponse = await fetch('/api/audio/transcribe', {
           method: 'POST',
           body: transcriptionForm,
@@ -180,6 +181,7 @@ export function useChatStreamingActions(
       form.append('serverUrl', serverUrl);
       form.append('model', activeChatModel);
       form.append('enableThinking', String(enableThinking));
+      form.append('speechLanguage', speechLanguage);
       if (file && !voice) {
         form.append('file', file);
       }
@@ -507,6 +509,7 @@ export function useChatStreamingActions(
     prefetchAudio,
     ttsVoice,
     ttsSpeed,
+    speechLanguage,
   ]);
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {

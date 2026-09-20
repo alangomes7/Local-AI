@@ -66,6 +66,19 @@ import {
   downloadConversationAsMarkdown,
 } from '../../../../utils/chat';
 import { useChatContext } from '../../../../contexts/ChatContext';
+
+const SPEECH_LANGUAGE_OPTIONS = [
+  { id: 'en', label: 'English' },
+  { id: 'pt', label: 'Portuguese' },
+  { id: 'es', label: 'Spanish' },
+  { id: 'fr', label: 'French' },
+  { id: 'de', label: 'German' },
+  { id: 'it', label: 'Italian' },
+  { id: 'ja', label: 'Japanese' },
+  { id: 'zh', label: 'Chinese' },
+  { id: 'hi', label: 'Hindi' },
+] as const;
+
 export function Composer() {
   const {
     activeChatModel,
@@ -78,6 +91,8 @@ export function Composer() {
     setVoiceChatState,
     isVoiceChatActive,
     setIsVoiceChatActive,
+    speechLanguage,
+    setSpeechLanguage,
     audioPlaybackRef,
     startContinuousRecording,
     stopVoiceChatRecording,
@@ -186,6 +201,26 @@ export function Composer() {
                 <div className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">
                   Voice Chat
                 </div>
+
+                <label className="flex items-center gap-2 text-xs text-neutral-300">
+                  <span>Speech language</span>
+                  <select
+                    value={speechLanguage}
+                    onChange={(event) => {
+                      const language = event.target.value;
+                      setSpeechLanguage(language);
+                      localStorage.setItem('speech_language', language);
+                    }}
+                    className="rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1 text-xs text-neutral-100 outline-none focus:border-sky-500"
+                    aria-label="Speech language"
+                  >
+                    {SPEECH_LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
                 {voiceChatState === 'idle' && (
                   <span className="text-neutral-300">Ready to listen...</span>
@@ -346,6 +381,26 @@ export function Composer() {
                 >
                   <Speech className="w-4 h-4" />
                 </button>
+
+                {/* SPEECH LANGUAGE SELECTOR */}
+                <select
+                  value={speechLanguage}
+                  onChange={(event) => {
+                    const language = event.target.value;
+                    setSpeechLanguage(language);
+                    localStorage.setItem('speech_language', language);
+                  }}
+                  disabled={loading}
+                  className="shrink-0 h-8 sm:h-9 bg-neutral-900/80 border border-neutral-700 rounded-lg px-2 text-[11px] sm:text-xs text-neutral-100 focus:outline-none focus:border-sky-500 disabled:opacity-50"
+                  aria-label="Speech transcription language"
+                  title="Spoken audio language for transcription & voice chat"
+                >
+                  {SPEECH_LANGUAGE_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
 
                 {/* THINKING BUTTON */}
                 <button

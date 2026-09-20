@@ -12,6 +12,7 @@ from transformers.cli.serving.response import ResponseHandler
 from transformers.cli.serving.server import build_server
 from transformers.cli.serving.transcription import TranscriptionHandler
 from transformers.cli.serving.utils import GenerationState
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from openai.types.audio import Transcription
 
@@ -20,11 +21,29 @@ from .memory import cleanup_memory, get_system_memory_status
 from .models import (
     LocalModelManager,
     get_loaded_models,
+    is_transcription_or_tts_only_model,
     load_model,
     unload_all_models,
     unload_model,
 )
 from .routes import add_custom_routes, log_registered_routes
+
+
+class LocalChatCompletionHandler(ChatCompletionHandler):
+    async def handle_request(self, request: Any, request_id: Any = None, *args: Any, **kwargs: Any) -> Any:
+        model = getattr(request, "model", None)
+        if isinstance(model, str) and is_transcription_or_tts_only_model(model):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Model '{model}' is an audio transcription/TTS model "
+                    "and cannot be used for /v1/chat/completions. "
+                    "Please select an LLM chat model (e.g., Qwen, Llama)."
+                ),
+            )
+        if request_id is not None:
+            kwargs["request_id"] = request_id
+        return await super().handle_request(request, *args, **kwargs)
 
 
 class LocalTranscriptionHandler(TranscriptionHandler):
@@ -82,7 +101,7 @@ def create_server() -> FastAPI:
         model_timeout=state.MODEL_TIMEOUT,
     )
     state.generation_state = GenerationState(continuous_batching=state.CONTINUOUS_BATCHING)
-    state.chat_handler = ChatCompletionHandler(
+    state.chat_handler = LocalChatCompletionHandler(
         model_manager=state.model_manager,
         generation_state=state.generation_state,
         chat_template_kwargs={},

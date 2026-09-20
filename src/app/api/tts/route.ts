@@ -27,61 +27,7 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      voices: [
-        'af_heart',
-        'af_bella',
-        'af_nicole',
-        'af_sarah',
-        'af_sky',
-        'af_alloy',
-        'af_aoede',
-        'af_jessica',
-        'af_kore',
-        'af_river',
-        'am_adam',
-        'am_echo',
-        'am_eric',
-        'am_fenrir',
-        'am_liam',
-        'am_michael',
-        'am_onyx',
-        'am_puck',
-        'am_santa',
-        'bf_alice',
-        'bf_emma',
-        'bf_isabella',
-        'bf_lily',
-        'bm_daniel',
-        'bm_fable',
-        'bm_george',
-        'bm_lewis',
-        'ef_dora',
-        'em_alex',
-        'em_santa',
-        'ff_siwis',
-        'hf_alpha',
-        'hf_beta',
-        'hm_omega',
-        'hm_psi',
-        'if_sara',
-        'im_nicola',
-        'jf_alpha',
-        'jf_gongitsune',
-        'jf_nezumi',
-        'jf_tebukuro',
-        'jm_kumo',
-        'pf_dora',
-        'pm_alex',
-        'pm_santa',
-        'zf_xiaobei',
-        'zf_xiaoni',
-        'zf_xiaoxiao',
-        'zf_xiaoyi',
-        'zm_yunjian',
-        'zm_yunxi',
-        'zm_yunxia',
-        'zm_yunyang',
-      ],
+      voices: ['de', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'pt', 'zh'],
     });
   } catch (error) {
     const message =
@@ -92,8 +38,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { text, language, serverUrl, model, keepLoaded, voice, speed } =
-      await req.json();
+    const { text, language, serverUrl, keepLoaded } = await req.json();
 
     if (!text) {
       return NextResponse.json(
@@ -104,7 +49,7 @@ export async function POST(req: Request) {
 
     const inferenceEndpoint =
       serverUrl || 'http://localhost:8000/v1/chat/completions';
-    const selectedModel = model || 'hexgrad/Kokoro-82M';
+    const selectedModel = 'facebook/hf-seamless-m4t-medium';
     const loadEndpoint = modelEndpoint(inferenceEndpoint, '/load_model');
     const unloadEndpoint = modelEndpoint(
       inferenceEndpoint,
@@ -130,8 +75,6 @@ export async function POST(req: Request) {
           input: text,
           model: selectedModel,
           language: language || 'en',
-          voice: voice || 'af_heart',
-          speed: typeof speed === 'number' ? speed : 1.0,
         }),
       });
 
