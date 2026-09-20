@@ -36,18 +36,34 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let errorMsg = `HTTP ${response.status}`;
+      try {
+        const parsed = JSON.parse(errorText);
+        errorMsg = parsed.error || parsed.detail || parsed.message || errorMsg;
+      } catch {
+        errorMsg = errorText || errorMsg;
+      }
+
       return NextResponse.json(
-        { error: `Inference server failed to unload: ${errorText}` },
+        { error: `Failed to unload model: ${errorMsg}` },
         { status: response.status },
       );
     }
 
     return NextResponse.json({ success: true, model });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Unload API error:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error during model unload.' },
-      { status: 500 },
-    );
+    const isConnRefused =
+      error?.code === 'ECONNREFUSED' ||
+      error?.message?.includes('fetch failed') ||
+      error?.cause?.code === 'ECONNREFUSED';
+
+    const message = isConnRefused
+      ? 'Could not connect to inference server. Ensure the local AI server is running and accessible.'
+      : error instanceof Error
+        ? error.message
+        : 'Error during model unload.';
+
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

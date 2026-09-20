@@ -2,30 +2,24 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const clientServerUrl = searchParams.get('serverUrl')?.trim();
+
     const endpoint =
+      clientServerUrl ||
       process.env.AI_INFERENCE_ENDPOINT ||
       'http://localhost:8000/v1/chat/completions';
 
-    /*
-     * Convert:
-     *
-     * /v1/chat/completions
-     *
-     * into:
-     *
-     * /v1/models
-     */
-    const modelsUrl = endpoint.replace(
-      /\/chat\/completions\/?$/,
-      '/models'
-    );
-
-    console.log('========================================');
-    console.log('MODEL DISCOVERY');
-    console.log('Endpoint:', modelsUrl);
-    console.log('========================================');
+    let modelsUrl = endpoint;
+    if (modelsUrl.includes('/chat/completions')) {
+      modelsUrl = modelsUrl.replace(/\/chat\/completions\/?$/, '/models');
+    } else if (modelsUrl.endsWith('/')) {
+      modelsUrl = `${modelsUrl}models`;
+    } else {
+      modelsUrl = `${modelsUrl}/models`;
+    }
 
     const response = await fetch(modelsUrl, {
       method: 'GET',
@@ -34,47 +28,76 @@ export async function GET() {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let cleanError = `Server returned HTTP ${response.status}`;
+      try {
+        const parsed = JSON.parse(errorText);
+        cleanError =
+          parsed.error || parsed.detail || parsed.message || cleanError;
+      } catch {
+        cleanError = errorText || cleanError;
+      }
 
       console.error(
-        `Transformers /v1/models returned HTTP ${response.status}:`,
-        errorText
+        `Inference server /models returned HTTP ${response.status}:`,
+        errorText,
       );
 
       return NextResponse.json(
         {
-          error: `Transformers server returned HTTP ${response.status}`,
+          error: `Inference server error (${response.status}): ${cleanError}`,
           details: errorText,
         },
         {
           status: response.status,
-        }
+        },
       );
     }
 
     const data = await response.json();
-
-    console.log(
-      'Available models:',
-      data.data?.map((model: { id?: string }) => model.id)
-    );
-
+    if (Array.isArray(data.data)) {
+      data.data = data.data.filter((item: any) => {
+        const id = String(item?.id || '').toLowerCase();
+        return (
+          !id.includes('parakeet') &&
+          !id.includes('kokoro') &&
+          !id.includes('whisper') &&
+          !id.includes('silero') &&
+          !id.includes('tts') &&
+          !id.includes('stt')
+        );
+      });
+      data.data.sort((a: any, b: any) => {
+        const idA = String(a?.id || '');
+        const idB = String(b?.id || '');
+        return idA.localeCompare(idB, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+      });
+    }
     return NextResponse.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Model discovery error:', error);
 
-    const message =
-      error instanceof Error
+    const isConnRefused =
+      error?.code === 'ECONNREFUSED' ||
+      error?.message?.includes('fetch failed') ||
+      error?.cause?.code === 'ECONNREFUSED';
+
+    const message = isConnRefused
+      ? 'Could not connect to inference server. Ensure the local AI server is running and accessible.'
+      : error instanceof Error
         ? error.message
-        : 'Could not connect to Transformers server';
+        : 'Unknown connection error';
 
     return NextResponse.json(
       {
-        error: 'Could not connect to Transformers server.',
-        details: message,
+        error: message,
+        details: error?.message,
       },
       {
         status: 502,
-      }
+      },
     );
   }
 }

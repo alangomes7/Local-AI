@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Transformers AI Chat">
+  <rect width="64" height="64" rx="14" fill="#0f172a"/>
+  <path d="M16 18h32v22H28l-10 8 2-8h-4z" fill="#38bdf8"/>
+  <circle cx="27" cy="29" r="3" fill="#0f172a"/>
+  <circle cx="37" cy="29" r="3" fill="#0f172a"/>
+  <path d="M25 36c4 3 10 3 14 0" fill="none" stroke="#0f172a" stroke-linecap="round" stroke-width="3"/>
+</svg>

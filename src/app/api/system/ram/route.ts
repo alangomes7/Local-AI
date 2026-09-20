@@ -17,7 +17,10 @@ export async function GET(req: Request) {
       const res = await fetch(endpoint, { cache: 'no-store' });
       if (res.ok) {
         const serverData = await res.json();
-        return NextResponse.json(serverData);
+        return NextResponse.json({
+          ...serverData,
+          from_inference_server: true,
+        });
       }
     } catch {
       // Fallback to local host RAM metrics below
@@ -29,6 +32,7 @@ export async function GET(req: Request) {
   const used = Math.max(total - free, 0);
 
   return NextResponse.json({
+    from_inference_server: false,
     primary_device: 'ram',
     total: (total / 1024 ** 3).toFixed(2),
     used: (used / 1024 ** 3).toFixed(2),
